@@ -1,0 +1,45 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+server
+
+# Test binary
+*.test
+
+# Output of go coverage
+*.out
+
+# Go workspace
+go.work
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment files (except examples)
+.env
+.env.local
+.env.prod
+!.env.example
+!.env.prod.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Generated files (optional - some prefer to commit these)
+# internal/graphql/generated/
+# internal/graphql/model/models_gen.go
+
+# Temporary files
+tmp/
+temp/

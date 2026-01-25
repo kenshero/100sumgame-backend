@@ -1,0 +1,104 @@
+# GraphQL Schema for Sum-100 Puzzle Game
+
+type Query {
+  """Get a game by ID"""
+  game(id: ID!): Game
+
+  """Get all puzzles from puzzle pool"""
+  puzzles: [Puzzle!]!
+
+  """Get leaderboard entries"""
+  leaderboard(limit: Int = 10): [LeaderboardEntry!]!
+}
+
+type Mutation {
+  """Create a new game"""
+  createGame(guestId: ID!): Game!
+
+  """Fill cells with values"""
+  fillCells(gameId: ID!, cells: [CellInput!]!): Game!
+
+  """Verify all cells in the game"""
+  verifyGame(gameId: ID!): VerifyResult!
+
+  """Complete the game and submit to leaderboard"""
+  completeGame(gameId: ID!, guestId: ID!, username: String!): CompleteGameResult!
+}
+
+"""Game represents a game session"""
+type Game {
+  id: ID!
+  grid: [[Cell!]!]!
+  totalMistakes: Int!
+  status: GameStatus!
+  tokensUsed: Int!
+  tokensRemaining: Int!
+  createdAt: String!
+}
+
+"""Cell represents a single cell in the grid"""
+type Cell {
+  row: Int!
+  col: Int!
+  value: Int
+  isPreFilled: Boolean!
+  feedback: CellFeedback
+}
+
+"""Game status enum"""
+enum GameStatus {
+  PLAYING
+  COMPLETED
+}
+
+"""Cell feedback after verification"""
+enum CellFeedback {
+  CORRECT
+  TOO_LOW
+  TOO_HIGH
+}
+
+"""Input for filling a cell"""
+input CellInput {
+  row: Int!
+  col: Int!
+  value: Int!
+}
+
+"""Result of verifying a game"""
+type VerifyResult {
+  game: Game!
+  results: [CellVerifyResult!]!
+  allCorrect: Boolean!
+  mistakesThisRound: Int!
+}
+
+"""Verification result for a single cell"""
+type CellVerifyResult {
+  row: Int!
+  col: Int!
+  feedback: CellFeedback!
+}
+
+"""Leaderboard entry"""
+type LeaderboardEntry {
+  id: ID!
+  guestId: ID!
+  username: String!
+  mistakes: Int!
+  createdAt: String!
+}
+
+"""Result of completing a game"""
+type CompleteGameResult {
+  entry: LeaderboardEntry!
+  rank: Int!
+}
+
+"""Puzzle from puzzle pool"""
+type Puzzle {
+  id: ID!
+  grid: [[Int!]!]!
+  solution: [[Int!]!]!
+  createdAt: String!
+}

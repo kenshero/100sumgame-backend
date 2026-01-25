@@ -1,0 +1,58 @@
+# gqlgen configuration file
+# See https://gqlgen.com/config/ for detailed config options
+
+schema:
+  - internal/graphql/schema/*.graphqls
+
+exec:
+  filename: internal/graphql/generated/generated.go
+  package: generated
+
+model:
+  filename: internal/graphql/model/models_gen.go
+  package: model
+
+resolver:
+  layout: follow-schema
+  dir: internal/graphql/resolver
+  package: resolver
+  filename_template: "{name}.resolver.go"
+
+# Use existing models instead of generating new ones
+models:
+  ID:
+    model:
+      - github.com/99designs/gqlgen/graphql.ID
+  Int:
+    model:
+      - github.com/99designs/gqlgen/graphql.Int
+  Game:
+    model:
+      - github.com/kenshero/100sumgame/internal/graphql/model.Game
+  Cell:
+    model:
+      - github.com/kenshero/100sumgame/internal/graphql/model.Cell
+  GameStatus:
+    model:
+      - github.com/kenshero/100sumgame/internal/graphql/model.GameStatus
+  CellFeedback:
+    model:
+      - github.com/kenshero/100sumgame/internal/graphql/model.CellFeedback
+  CellInput:
+    model:
+      - github.com/kenshero/100sumgame/internal/graphql/model.CellInput
+  VerifyResult:
+    model:
+      - github.com/kenshero/100sumgame/internal/graphql/model.VerifyResult
+  CellVerifyResult:
+    model:
+      - github.com/kenshero/100sumgame/internal/graphql/model.CellVerifyResult
+  LeaderboardEntry:
+    model:
+      - github.com/kenshero/100sumgame/internal/graphql/model.LeaderboardEntry
+  CompleteGameResult:
+    model:
+      - github.com/kenshero/100sumgame/internal/graphql/model.CompleteGameResult
+  ChatResponse:
+    model:
+      - github.com/kenshero/100sumgame/internal/graphql/model.ChatResponse
