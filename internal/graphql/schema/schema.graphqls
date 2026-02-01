@@ -28,11 +28,11 @@ type Mutation {
 """Game represents a game session"""
 type Game {
   id: ID!
+  guestId: ID!
+  puzzleId: ID!
   grid: [[Cell!]!]!
   totalMistakes: Int!
   status: GameStatus!
-  tokensUsed: Int!
-  tokensRemaining: Int!
   createdAt: String!
 }
 

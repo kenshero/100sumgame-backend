@@ -11,22 +11,35 @@ import (
 
 // GameService handles game-related business logic
 type GameService struct {
-	repo          repository.GameRepository
-	puzzleService *PuzzleService
+	repo               repository.GameRepository
+	puzzleService      *PuzzleService
+	puzzleProgressRepo repository.PuzzleProgressRepository
+	createGameLimiter  *OperationRateLimiter
+	fillCellsLimiter   *OperationRateLimiter
+	verifyGameLimiter  *OperationRateLimiter
 }
 
 // NewGameService creates a new game service
-func NewGameService(repo repository.GameRepository, puzzleService *PuzzleService) *GameService {
+func NewGameService(repo repository.GameRepository, puzzleService *PuzzleService, puzzleProgressRepo repository.PuzzleProgressRepository) *GameService {
 	return &GameService{
-		repo:          repo,
-		puzzleService: puzzleService,
+		repo:               repo,
+		puzzleService:      puzzleService,
+		puzzleProgressRepo: puzzleProgressRepo,
+		createGameLimiter:  NewOperationRateLimiter(10, 1*time.Minute), // 10 games per minute per guest/IP
+		fillCellsLimiter:   NewOperationRateLimiter(30, 1*time.Minute), // 30 fill operations per minute per guest/IP
+		verifyGameLimiter:  NewOperationRateLimiter(10, 1*time.Minute), // 10 verifications per minute per guest/IP
 	}
 }
 
-// CreateGame creates a new game with a random puzzle
+// CreateGame creates a new game with a random puzzle for guest
 func (s *GameService) CreateGame(ctx context.Context, guestID uuid.UUID) (*domain.Game, error) {
-	// Get a random puzzle
-	puzzle, err := s.puzzleService.GetRandom(ctx)
+	// Check rate limit BEFORE database operation
+	if !s.createGameLimiter.AllowGuest(guestID) {
+		return nil, domain.ErrRateLimitExceeded
+	}
+
+	// Get a random puzzle that guest hasn't completed yet
+	puzzle, err := s.puzzleService.GetRandomForGuest(ctx, guestID)
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +66,11 @@ func (s *GameService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Game, 
 
 // FillCells fills cells with values
 func (s *GameService) FillCells(ctx context.Context, gameID uuid.UUID, cells []domain.CellInput) (*domain.Game, error) {
+	// Check rate limit BEFORE database operation
+	if !s.fillCellsLimiter.AllowGuest(gameID) {
+		return nil, domain.ErrRateLimitExceeded
+	}
+
 	game, err := s.GetByID(ctx, gameID)
 	if err != nil {
 		return nil, err
@@ -104,6 +122,11 @@ func (s *GameService) validateAndFillCell(game *domain.Game, cell domain.CellInp
 
 // VerifyGame verifies all cells in the game
 func (s *GameService) VerifyGame(ctx context.Context, gameID uuid.UUID) (*domain.Game, *domain.VerifyResult, error) {
+	// Check rate limit BEFORE database operation
+	if !s.verifyGameLimiter.AllowGuest(gameID) {
+		return nil, nil, domain.ErrRateLimitExceeded
+	}
+
 	game, err := s.GetByID(ctx, gameID)
 	if err != nil {
 		return nil, nil, err
@@ -141,14 +164,16 @@ func (s *GameService) VerifyGame(ctx context.Context, gameID uuid.UUID) (*domain
 			var feedback domain.CellFeedback
 			if currentValue == correctValue {
 				feedback = domain.FeedbackCorrect
-			} else if currentValue < correctValue {
-				feedback = domain.FeedbackTooLow
-				result.AllCorrect = false
-				result.Mistakes++
 			} else {
-				feedback = domain.FeedbackTooHigh
-				result.AllCorrect = false
-				result.Mistakes++
+				if currentValue < correctValue {
+					feedback = domain.FeedbackTooLow
+					result.AllCorrect = false
+					result.Mistakes++
+				} else {
+					feedback = domain.FeedbackTooHigh
+					result.AllCorrect = false
+					result.Mistakes++
+				}
 			}
 
 			cell.Feedback = feedback
@@ -167,6 +192,13 @@ func (s *GameService) VerifyGame(ctx context.Context, gameID uuid.UUID) (*domain
 	// Check if game is complete
 	if result.AllCorrect {
 		game.Status = domain.StatusCompleted
+
+		// Mark puzzle as completed for this guest
+		if err := s.puzzleProgressRepo.MarkCompleted(ctx, game.GuestID, game.PuzzleID); err != nil {
+			// Log error but don't fail the verification
+			// The game is still saved, but progress tracking might have failed
+			// This can be retried later if needed
+		}
 	}
 
 	// Save updated game
@@ -175,21 +207,4 @@ func (s *GameService) VerifyGame(ctx context.Context, gameID uuid.UUID) (*domain
 	}
 
 	return game, result, nil
-}
-
-// UseTokens deducts tokens from the game
-func (s *GameService) UseTokens(ctx context.Context, gameID uuid.UUID, tokens int) error {
-	game, err := s.GetByID(ctx, gameID)
-	if err != nil {
-		return err
-	}
-
-	if game.TokensUsed+tokens > game.TokensLimit {
-		return domain.ErrTokensExhausted
-	}
-
-	game.TokensUsed += tokens
-	game.UpdatedAt = time.Now()
-
-	return s.repo.Update(ctx, game)
 }

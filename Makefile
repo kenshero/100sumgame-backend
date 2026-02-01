@@ -51,12 +51,12 @@ dev: db-start db-wait
 	@echo "$(GREEN)  Press Ctrl+C to stop$(NC)"
 	@echo "$(GREEN)========================================$(NC)"
 	@echo ""
-	cd .. && docker-compose up --build backend
+	docker-compose up --build backend
 
 # Start database only (background)
 db-start:
 	@echo "$(YELLOW)🐘 Starting PostgreSQL...$(NC)"
-	cd .. && docker-compose up -d db
+	docker-compose up -d db
 
 # Wait for database to be ready
 db-wait:
@@ -72,7 +72,7 @@ db-wait:
 # Start all in background
 dev-up:
 	@echo "$(YELLOW)🚀 Starting all services in background...$(NC)"
-	cd .. && docker-compose up -d --build
+	docker-compose up -d --build
 	@echo "$(GREEN)✅ Services started!$(NC)"
 	@echo ""
 	@echo "View logs: make dev-logs"
@@ -80,19 +80,19 @@ dev-up:
 
 # Show backend logs (attach to running container)
 dev-logs:
-	cd .. && docker-compose logs -f --tail=100 backend
+	docker-compose logs -f --tail=100 backend
 
 logs:
-	cd .. && docker-compose logs -f --tail=100 backend
+	docker-compose logs -f --tail=100 backend
 
 down:
 	@echo "$(YELLOW)🛑 Stopping all services...$(NC)"
-	cd .. && docker-compose down
+	docker-compose down
 	@echo "$(GREEN)✅ All services stopped$(NC)"
 
 restart:
 	@echo "$(YELLOW)🔄 Restarting backend...$(NC)"
-	cd .. && docker-compose restart backend
+	docker-compose restart backend
 	@echo "$(GREEN)✅ Backend restarted$(NC)"
 
 # ============================================
@@ -143,7 +143,7 @@ gql-install:
 
 build-prod:
 	@echo "$(YELLOW)🏗️  Building production image...$(NC)"
-	cd .. && docker-compose -f docker-compose.prod.yml build
+	docker-compose -f docker-compose.prod.yml build
 	@echo "$(GREEN)✅ Production image built!$(NC)"
 
 # ============================================
@@ -152,5 +152,5 @@ build-prod:
 
 clean:
 	@echo "$(YELLOW)🧹 Cleaning up containers and volumes...$(NC)"
-	cd .. && docker-compose down -v --remove-orphans
+	docker-compose down -v --remove-orphans
 	@echo "$(GREEN)✅ Cleaned up!$(NC)"

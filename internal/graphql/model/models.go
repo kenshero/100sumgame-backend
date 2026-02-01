@@ -3,6 +3,8 @@ package model
 // Game represents a game session
 type Game struct {
 	ID              string     `json:"id"`
+	GuestID         string     `json:"guestId"`
+	PuzzleID        string     `json:"puzzleId"`
 	Grid            [][]*Cell  `json:"grid"`
 	TotalMistakes   int        `json:"totalMistakes"`
 	Status          GameStatus `json:"status"`

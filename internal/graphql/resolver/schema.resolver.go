@@ -7,16 +7,25 @@ package resolver
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/kenshero/100sumgame/internal/domain"
 	"github.com/kenshero/100sumgame/internal/graphql/generated"
 	"github.com/kenshero/100sumgame/internal/graphql/model"
+	"github.com/kenshero/100sumgame/internal/middleware"
 )
 
 // CreateGame mutation resolver
 func (r *mutationResolver) CreateGame(ctx context.Context, guestID string) (*model.Game, error) {
-	guestUUID, err := uuid.Parse(guestID)
+	// Get session from context
+	session := middleware.GetSessionFromContext(ctx)
+	if session == nil {
+		return nil, fmt.Errorf("session not found")
+	}
+
+	// Parse guest ID from session
+	guestUUID, err := uuid.Parse(session.GuestID)
 	if err != nil {
 		return nil, err
 	}
@@ -85,12 +94,19 @@ func (r *mutationResolver) VerifyGame(ctx context.Context, gameID string) (*mode
 
 // CompleteGame mutation resolver
 func (r *mutationResolver) CompleteGame(ctx context.Context, gameID string, guestID string, username string) (*model.CompleteGameResult, error) {
-	id, err := uuid.Parse(gameID)
+	// Get session from context
+	session := middleware.GetSessionFromContext(ctx)
+	if session == nil {
+		return nil, fmt.Errorf("session not found")
+	}
+
+	// Parse guest ID from session (ignore the guestID parameter from client)
+	guestUUID, err := uuid.Parse(session.GuestID)
 	if err != nil {
 		return nil, err
 	}
 
-	guestUUID, err := uuid.Parse(guestID)
+	id, err := uuid.Parse(gameID)
 	if err != nil {
 		return nil, err
 	}
@@ -181,3 +197,17 @@ func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	func (r *gameResolver) GuestID(ctx context.Context, obj *model.Game) (string, error) {
+	panic(fmt.Errorf("not implemented: GuestID - guestId"))
+}
+func (r *Resolver) Game() generated.GameResolver { return &gameResolver{r} }
+type gameResolver struct{ *Resolver }
+*/

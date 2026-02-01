@@ -30,13 +30,13 @@ func domainGameToModel(game *domain.Game) *model.Game {
 	}
 
 	return &model.Game{
-		ID:              game.ID.String(),
-		Grid:            grid,
-		TotalMistakes:   game.TotalMistakes,
-		Status:          model.GameStatus(game.Status),
-		TokensUsed:      game.TokensUsed,
-		TokensRemaining: game.TokensLimit - game.TokensUsed,
-		CreatedAt:       game.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:            game.ID.String(),
+		GuestID:       game.GuestID.String(),
+		PuzzleID:      game.PuzzleID.String(),
+		Grid:          grid,
+		TotalMistakes: game.TotalMistakes,
+		Status:        model.GameStatus(game.Status),
+		CreatedAt:     game.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
 

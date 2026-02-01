@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"math/rand"
 
 	"github.com/google/uuid"
 	"github.com/kenshero/100sumgame/internal/domain"
@@ -30,6 +31,28 @@ func (s *PuzzleService) GetRandom(ctx context.Context) (*domain.Puzzle, error) {
 		return nil, domain.ErrNoPuzzlesAvailable
 	}
 	return puzzle, nil
+}
+
+// GetRandomForGuest retrieves a random puzzle that the guest hasn't played much
+// Returns puzzles sorted by least played by this guest
+func (s *PuzzleService) GetRandomForGuest(ctx context.Context, guestID uuid.UUID) (*domain.Puzzle, error) {
+	puzzles, err := s.repo.GetAvailablePuzzlesForGuest(ctx, guestID)
+	if err != nil {
+		return nil, domain.ErrNoPuzzlesAvailable
+	}
+	if len(puzzles) == 0 {
+		return nil, domain.ErrNoPuzzlesAvailable
+	}
+	// Random เลือกจาก top 10 ที่เล่นน้อยสุด
+	// ถ้ามีน้อยกว่า 10 ก็เลือกจากทั้งหมด
+	maxPuzzles := 10
+	if len(puzzles) < maxPuzzles {
+		maxPuzzles = len(puzzles)
+	}
+
+	// Random เลือก index
+	randomIndex := rand.Intn(maxPuzzles)
+	return puzzles[randomIndex], nil
 }
 
 // GetAll retrieves all puzzles

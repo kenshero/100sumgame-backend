@@ -11,6 +11,7 @@ import (
 type PuzzleRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Puzzle, error)
 	GetRandom(ctx context.Context) (*domain.Puzzle, error)
+	GetAvailablePuzzlesForGuest(ctx context.Context, guestID uuid.UUID) ([]*domain.Puzzle, error)
 	GetAll(ctx context.Context) ([]*domain.Puzzle, error)
 	Create(ctx context.Context, puzzle *domain.Puzzle) error
 }
@@ -28,4 +29,11 @@ type LeaderboardRepository interface {
 	GetTop(ctx context.Context, limit int) ([]*domain.LeaderboardEntry, error)
 	Create(ctx context.Context, entry *domain.LeaderboardEntry) error
 	GetRank(ctx context.Context, mistakes int) (int, error)
+}
+
+// PuzzleProgressRepository defines the interface for guest puzzle progress tracking
+type PuzzleProgressRepository interface {
+	MarkCompleted(ctx context.Context, guestID, puzzleID uuid.UUID) error
+	GetCompletedPuzzles(ctx context.Context, guestID uuid.UUID) ([]uuid.UUID, error)
+	HasCompleted(ctx context.Context, guestID, puzzleID uuid.UUID) (bool, error)
 }

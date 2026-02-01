@@ -1,0 +1,52 @@
+# Docker Compose for Local Development
+# Usage: docker-compose up -d
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: sum100-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sum100game
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Go Backend (Development with hot reload)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: devops/Dockerfile.dev
+    container_name: sum100-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount source code for hot reload
+      - ./backend:/app
+      # Exclude go modules cache from mount
+      - go_modules:/go/pkg/mod
+    env_file:
+      - ./backend/devops/.env.dev
+    depends_on:
+      db:
+        condition: service_healthy
+    # Use air for hot reload, or just go run
+    command: go run cmd/server/main.go
+
+volumes:
+  postgres_data:
+  go_modules:
+
+networks:
+  default:
+    name: sum100-network

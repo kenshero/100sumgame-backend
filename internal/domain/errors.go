@@ -12,4 +12,5 @@ var (
 	ErrGameAlreadyComplete = errors.New("game is already completed")
 	ErrTokensExhausted     = errors.New("tokens exhausted for this game")
 	ErrNoPuzzlesAvailable  = errors.New("no puzzles available")
+	ErrRateLimitExceeded   = errors.New("rate limit exceeded, please try again later")
 )

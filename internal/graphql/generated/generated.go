@@ -66,13 +66,13 @@ type ComplexityRoot struct {
 	}
 
 	Game struct {
-		CreatedAt       func(childComplexity int) int
-		Grid            func(childComplexity int) int
-		ID              func(childComplexity int) int
-		Status          func(childComplexity int) int
-		TokensRemaining func(childComplexity int) int
-		TokensUsed      func(childComplexity int) int
-		TotalMistakes   func(childComplexity int) int
+		CreatedAt     func(childComplexity int) int
+		Grid          func(childComplexity int) int
+		GuestID       func(childComplexity int) int
+		ID            func(childComplexity int) int
+		PuzzleID      func(childComplexity int) int
+		Status        func(childComplexity int) int
+		TotalMistakes func(childComplexity int) int
 	}
 
 	LeaderboardEntry struct {
@@ -217,30 +217,30 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Game.Grid(childComplexity), true
+	case "Game.guestId":
+		if e.complexity.Game.GuestID == nil {
+			break
+		}
+
+		return e.complexity.Game.GuestID(childComplexity), true
 	case "Game.id":
 		if e.complexity.Game.ID == nil {
 			break
 		}
 
 		return e.complexity.Game.ID(childComplexity), true
+	case "Game.puzzleId":
+		if e.complexity.Game.PuzzleID == nil {
+			break
+		}
+
+		return e.complexity.Game.PuzzleID(childComplexity), true
 	case "Game.status":
 		if e.complexity.Game.Status == nil {
 			break
 		}
 
 		return e.complexity.Game.Status(childComplexity), true
-	case "Game.tokensRemaining":
-		if e.complexity.Game.TokensRemaining == nil {
-			break
-		}
-
-		return e.complexity.Game.TokensRemaining(childComplexity), true
-	case "Game.tokensUsed":
-		if e.complexity.Game.TokensUsed == nil {
-			break
-		}
-
-		return e.complexity.Game.TokensUsed(childComplexity), true
 	case "Game.totalMistakes":
 		if e.complexity.Game.TotalMistakes == nil {
 			break
@@ -539,11 +539,11 @@ type Mutation {
 """Game represents a game session"""
 type Game {
   id: ID!
+  guestId: ID!
+  puzzleId: ID!
   grid: [[Cell!]!]!
   totalMistakes: Int!
   status: GameStatus!
-  tokensUsed: Int!
-  tokensRemaining: Int!
   createdAt: String!
 }
 
@@ -1096,6 +1096,64 @@ func (ec *executionContext) fieldContext_Game_id(_ context.Context, field graphq
 	return fc, nil
 }
 
+func (ec *executionContext) _Game_guestId(ctx context.Context, field graphql.CollectedField, obj *model.Game) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Game_guestId,
+		func(ctx context.Context) (any, error) {
+			return obj.GuestID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Game_guestId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Game",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Game_puzzleId(ctx context.Context, field graphql.CollectedField, obj *model.Game) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Game_puzzleId,
+		func(ctx context.Context) (any, error) {
+			return obj.PuzzleID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Game_puzzleId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Game",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Game_grid(ctx context.Context, field graphql.CollectedField, obj *model.Game) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1190,64 +1248,6 @@ func (ec *executionContext) fieldContext_Game_status(_ context.Context, field gr
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type GameStatus does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Game_tokensUsed(ctx context.Context, field graphql.CollectedField, obj *model.Game) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Game_tokensUsed,
-		func(ctx context.Context) (any, error) {
-			return obj.TokensUsed, nil
-		},
-		nil,
-		ec.marshalNInt2int,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Game_tokensUsed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Game",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Game_tokensRemaining(ctx context.Context, field graphql.CollectedField, obj *model.Game) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Game_tokensRemaining,
-		func(ctx context.Context) (any, error) {
-			return obj.TokensRemaining, nil
-		},
-		nil,
-		ec.marshalNInt2int,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Game_tokensRemaining(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Game",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -1454,16 +1454,16 @@ func (ec *executionContext) fieldContext_Mutation_createGame(ctx context.Context
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Game_id(ctx, field)
+			case "guestId":
+				return ec.fieldContext_Game_guestId(ctx, field)
+			case "puzzleId":
+				return ec.fieldContext_Game_puzzleId(ctx, field)
 			case "grid":
 				return ec.fieldContext_Game_grid(ctx, field)
 			case "totalMistakes":
 				return ec.fieldContext_Game_totalMistakes(ctx, field)
 			case "status":
 				return ec.fieldContext_Game_status(ctx, field)
-			case "tokensUsed":
-				return ec.fieldContext_Game_tokensUsed(ctx, field)
-			case "tokensRemaining":
-				return ec.fieldContext_Game_tokensRemaining(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Game_createdAt(ctx, field)
 			}
@@ -1511,16 +1511,16 @@ func (ec *executionContext) fieldContext_Mutation_fillCells(ctx context.Context,
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Game_id(ctx, field)
+			case "guestId":
+				return ec.fieldContext_Game_guestId(ctx, field)
+			case "puzzleId":
+				return ec.fieldContext_Game_puzzleId(ctx, field)
 			case "grid":
 				return ec.fieldContext_Game_grid(ctx, field)
 			case "totalMistakes":
 				return ec.fieldContext_Game_totalMistakes(ctx, field)
 			case "status":
 				return ec.fieldContext_Game_status(ctx, field)
-			case "tokensUsed":
-				return ec.fieldContext_Game_tokensUsed(ctx, field)
-			case "tokensRemaining":
-				return ec.fieldContext_Game_tokensRemaining(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Game_createdAt(ctx, field)
 			}
@@ -1782,16 +1782,16 @@ func (ec *executionContext) fieldContext_Query_game(ctx context.Context, field g
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Game_id(ctx, field)
+			case "guestId":
+				return ec.fieldContext_Game_guestId(ctx, field)
+			case "puzzleId":
+				return ec.fieldContext_Game_puzzleId(ctx, field)
 			case "grid":
 				return ec.fieldContext_Game_grid(ctx, field)
 			case "totalMistakes":
 				return ec.fieldContext_Game_totalMistakes(ctx, field)
 			case "status":
 				return ec.fieldContext_Game_status(ctx, field)
-			case "tokensUsed":
-				return ec.fieldContext_Game_tokensUsed(ctx, field)
-			case "tokensRemaining":
-				return ec.fieldContext_Game_tokensRemaining(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Game_createdAt(ctx, field)
 			}
@@ -2038,16 +2038,16 @@ func (ec *executionContext) fieldContext_VerifyResult_game(_ context.Context, fi
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Game_id(ctx, field)
+			case "guestId":
+				return ec.fieldContext_Game_guestId(ctx, field)
+			case "puzzleId":
+				return ec.fieldContext_Game_puzzleId(ctx, field)
 			case "grid":
 				return ec.fieldContext_Game_grid(ctx, field)
 			case "totalMistakes":
 				return ec.fieldContext_Game_totalMistakes(ctx, field)
 			case "status":
 				return ec.fieldContext_Game_status(ctx, field)
-			case "tokensUsed":
-				return ec.fieldContext_Game_tokensUsed(ctx, field)
-			case "tokensRemaining":
-				return ec.fieldContext_Game_tokensRemaining(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Game_createdAt(ctx, field)
 			}
@@ -3809,6 +3809,16 @@ func (ec *executionContext) _Game(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "guestId":
+			out.Values[i] = ec._Game_guestId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "puzzleId":
+			out.Values[i] = ec._Game_puzzleId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "grid":
 			out.Values[i] = ec._Game_grid(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -3821,16 +3831,6 @@ func (ec *executionContext) _Game(ctx context.Context, sel ast.SelectionSet, obj
 			}
 		case "status":
 			out.Values[i] = ec._Game_status(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "tokensUsed":
-			out.Values[i] = ec._Game_tokensUsed(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "tokensRemaining":
-			out.Values[i] = ec._Game_tokensRemaining(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

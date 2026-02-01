@@ -81,6 +81,53 @@ func (r *puzzleRepository) GetRandom(ctx context.Context) (*domain.Puzzle, error
 	return &puzzle, nil
 }
 
+func (r *puzzleRepository) GetAvailablePuzzlesForGuest(ctx context.Context, guestID uuid.UUID) ([]*domain.Puzzle, error) {
+	// เลือก puzzles ที่ยังไม่เคยเล่นจบของ guest นี้
+	query := `
+		SELECT p.id, p.grid_solution, p.prefilled_positions, p.difficulty, p.created_at
+		FROM puzzle_pool p
+		WHERE NOT EXISTS (
+			SELECT 1 FROM guest_puzzle_progress gpp
+			WHERE gpp.guest_id = $1 AND gpp.puzzle_id = p.id
+		)
+		ORDER BY RANDOM()
+		LIMIT 10
+	`
+
+	rows, err := r.db.Query(ctx, query, guestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var puzzles []*domain.Puzzle
+	for rows.Next() {
+		var puzzle domain.Puzzle
+		var gridJSON, positionsJSON []byte
+
+		if err := rows.Scan(
+			&puzzle.ID,
+			&gridJSON,
+			&positionsJSON,
+			&puzzle.Difficulty,
+			&puzzle.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal(gridJSON, &puzzle.GridSolution); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(positionsJSON, &puzzle.PrefilledPositions); err != nil {
+			return nil, err
+		}
+
+		puzzles = append(puzzles, &puzzle)
+	}
+
+	return puzzles, nil
+}
+
 func (r *puzzleRepository) GetAll(ctx context.Context) ([]*domain.Puzzle, error) {
 	query := `
 		SELECT id, grid_solution, prefilled_positions, difficulty, created_at

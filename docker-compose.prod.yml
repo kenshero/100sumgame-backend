@@ -1,0 +1,43 @@
+# Docker Compose for Production
+# Usage: docker-compose -f docker-compose.prod.yml up -d
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: sum100-db-prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_DB: ${DB_NAME:-sum100game}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # No port exposed in production (internal only)
+
+  # Go Backend (Production build)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: devops/Dockerfile.prod
+    container_name: sum100-backend-prod
+    restart: always
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./backend/devops/.env.prod
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data_prod:
+
+networks:
+  default:
+    name: sum100-network-prod
