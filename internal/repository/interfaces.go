@@ -13,6 +13,7 @@ type PuzzleRepository interface {
 	GetRandom(ctx context.Context) (*domain.Puzzle, error)
 	GetAvailablePuzzlesForGuest(ctx context.Context, guestID uuid.UUID) ([]*domain.Puzzle, error)
 	GetAll(ctx context.Context) ([]*domain.Puzzle, error)
+	GetTotalCount(ctx context.Context) (int, error)
 	Create(ctx context.Context, puzzle *domain.Puzzle) error
 }
 
@@ -22,6 +23,7 @@ type GameRepository interface {
 	Create(ctx context.Context, game *domain.Game) error
 	Update(ctx context.Context, game *domain.Game) error
 	Delete(ctx context.Context, id uuid.UUID) error
+	GetPuzzleStats(ctx context.Context, puzzleID uuid.UUID) (*domain.PuzzleStats, error)
 }
 
 // LeaderboardRepository defines the interface for leaderboard data access
@@ -35,5 +37,6 @@ type LeaderboardRepository interface {
 type PuzzleProgressRepository interface {
 	MarkCompleted(ctx context.Context, guestID, puzzleID uuid.UUID) error
 	GetCompletedPuzzles(ctx context.Context, guestID uuid.UUID) ([]uuid.UUID, error)
+	GetCompletedCount(ctx context.Context, guestID uuid.UUID) (int, error)
 	HasCompleted(ctx context.Context, guestID, puzzleID uuid.UUID) (bool, error)
 }

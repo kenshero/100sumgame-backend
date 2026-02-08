@@ -69,6 +69,30 @@ type VerifyResult struct {
 	Mistakes   int                `json:"mistakes"`
 }
 
+// MoveResult represents the result of making a single move
+type MoveResult struct {
+	Game          *Game        `json:"game"`
+	IsCorrect     bool         `json:"is_correct"`
+	Feedback      CellFeedback `json:"feedback"`
+	TotalMistakes int          `json:"total_mistakes"`
+	IsGameOver    bool         `json:"is_game_over"`
+}
+
+// PuzzleStats represents statistics for a specific puzzle
+type PuzzleStats struct {
+	PuzzleID        uuid.UUID `json:"puzzle_id"`
+	TotalPlayers    int       `json:"total_players"`
+	TotalCompleted  int       `json:"total_completed"`
+	AverageMistakes float64   `json:"average_mistakes"`
+}
+
+// PlayerStats represents statistics for a specific player
+type PlayerStats struct {
+	GuestID          uuid.UUID `json:"guest_id"`
+	PuzzlesCompleted int       `json:"puzzles_completed"`
+	TotalPuzzles     int       `json:"total_puzzles"`
+}
+
 // CellVerifyResult represents the verification result for a single cell
 type CellVerifyResult struct {
 	Row      int          `json:"row"`

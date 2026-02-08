@@ -62,6 +62,29 @@ func (r *mutationResolver) FillCells(ctx context.Context, gameID string, cells [
 	return domainGameToModel(game), nil
 }
 
+// MakeMove mutation resolver
+func (r *mutationResolver) MakeMove(ctx context.Context, gameID string, row int, col int, value int) (*model.MoveResult, error) {
+	id, err := uuid.Parse(gameID)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := r.GameService.MakeMove(ctx, id, row, col, value)
+	if err != nil {
+		return nil, err
+	}
+
+	feedback := model.CellFeedback(result.Feedback)
+
+	return &model.MoveResult{
+		Game:          domainGameToModel(result.Game),
+		IsCorrect:     result.IsCorrect,
+		Feedback:      feedback,
+		TotalMistakes: result.TotalMistakes,
+		IsGameOver:    result.IsGameOver,
+	}, nil
+}
+
 // VerifyGame mutation resolver
 func (r *mutationResolver) VerifyGame(ctx context.Context, gameID string) (*model.VerifyResult, error) {
 	id, err := uuid.Parse(gameID)
@@ -189,6 +212,45 @@ func (r *queryResolver) Leaderboard(ctx context.Context, limit *int) ([]*model.L
 	return result, nil
 }
 
+// PuzzleStats query resolver
+func (r *queryResolver) PuzzleStats(ctx context.Context, puzzleID string) (*model.PuzzleStats, error) {
+	id, err := uuid.Parse(puzzleID)
+	if err != nil {
+		return nil, err
+	}
+
+	stats, err := r.GameService.GetPuzzleStats(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.PuzzleStats{
+		PuzzleID:        stats.PuzzleID.String(),
+		TotalPlayers:    stats.TotalPlayers,
+		TotalCompleted:  stats.TotalCompleted,
+		AverageMistakes: stats.AverageMistakes,
+	}, nil
+}
+
+// PlayerStats query resolver
+func (r *queryResolver) PlayerStats(ctx context.Context, guestID string) (*model.PlayerStats, error) {
+	id, err := uuid.Parse(guestID)
+	if err != nil {
+		return nil, err
+	}
+
+	stats, err := r.GameService.GetPlayerStats(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.PlayerStats{
+		GuestID:          stats.GuestID.String(),
+		PuzzlesCompleted: stats.PuzzlesCompleted,
+		TotalPuzzles:     stats.TotalPuzzles,
+	}, nil
+}
+
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
@@ -197,17 +259,3 @@ func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	func (r *gameResolver) GuestID(ctx context.Context, obj *model.Game) (string, error) {
-	panic(fmt.Errorf("not implemented: GuestID - guestId"))
-}
-func (r *Resolver) Game() generated.GameResolver { return &gameResolver{r} }
-type gameResolver struct{ *Resolver }
-*/

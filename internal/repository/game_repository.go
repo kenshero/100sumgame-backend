@@ -132,3 +132,28 @@ func (r *gameRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.Exec(ctx, query, id)
 	return err
 }
+
+func (r *gameRepository) GetPuzzleStats(ctx context.Context, puzzleID uuid.UUID) (*domain.PuzzleStats, error) {
+	query := `
+		SELECT 
+			COUNT(*) as total_players,
+			COUNT(*) FILTER (WHERE status = 'completed') as total_completed,
+			COALESCE(AVG(total_mistakes) FILTER (WHERE status = 'completed'), 0) as avg_mistakes
+		FROM game_sessions 
+		WHERE puzzle_id = $1
+	`
+
+	var stats domain.PuzzleStats
+	err := r.db.QueryRow(ctx, query, puzzleID).Scan(
+		&stats.TotalPlayers,
+		&stats.TotalCompleted,
+		&stats.AverageMistakes,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	stats.PuzzleID = puzzleID
+
+	return &stats, nil
+}

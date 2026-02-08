@@ -2,7 +2,23 @@
 
 package model
 
+// Result of making a single move
+type MoveResult struct {
+	Game          *Game        `json:"game"`
+	IsCorrect     bool         `json:"isCorrect"`
+	Feedback      CellFeedback `json:"feedback"`
+	TotalMistakes int          `json:"totalMistakes"`
+	IsGameOver    bool         `json:"isGameOver"`
+}
+
 type Mutation struct {
+}
+
+// Statistics for a specific player
+type PlayerStats struct {
+	GuestID          string `json:"guestId"`
+	PuzzlesCompleted int    `json:"puzzlesCompleted"`
+	TotalPuzzles     int    `json:"totalPuzzles"`
 }
 
 // Puzzle from puzzle pool
@@ -11,6 +27,14 @@ type Puzzle struct {
 	Grid      [][]int `json:"grid"`
 	Solution  [][]int `json:"solution"`
 	CreatedAt string  `json:"createdAt"`
+}
+
+// Statistics for a specific puzzle
+type PuzzleStats struct {
+	PuzzleID        string  `json:"puzzleId"`
+	TotalPlayers    int     `json:"totalPlayers"`
+	TotalCompleted  int     `json:"totalCompleted"`
+	AverageMistakes float64 `json:"averageMistakes"`
 }
 
 type Query struct {

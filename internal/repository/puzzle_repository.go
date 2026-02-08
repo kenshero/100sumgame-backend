@@ -169,6 +169,14 @@ func (r *puzzleRepository) GetAll(ctx context.Context) ([]*domain.Puzzle, error)
 	return puzzles, nil
 }
 
+func (r *puzzleRepository) GetTotalCount(ctx context.Context) (int, error) {
+	query := `SELECT COUNT(*) FROM puzzle_pool`
+
+	var count int
+	err := r.db.QueryRow(ctx, query).Scan(&count)
+	return count, err
+}
+
 func (r *puzzleRepository) Create(ctx context.Context, puzzle *domain.Puzzle) error {
 	query := `
 		INSERT INTO puzzle_pool (id, grid_solution, prefilled_positions, difficulty, created_at)

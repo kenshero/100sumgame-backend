@@ -60,9 +60,14 @@ func (s *PuzzleService) GetAll(ctx context.Context) ([]*domain.Puzzle, error) {
 	return s.repo.GetAll(ctx)
 }
 
+// GetTotalCount retrieves the total number of puzzles
+func (s *PuzzleService) GetTotalCount(ctx context.Context) (int, error) {
+	return s.repo.GetTotalCount(ctx)
+}
+
 // Create creates a new puzzle
 func (s *PuzzleService) Create(ctx context.Context, puzzle *domain.Puzzle) error {
-	// Validate the puzzle solution
+	// Validate puzzle solution
 	if !domain.ValidatePuzzle(puzzle.GridSolution) {
 		return domain.ErrInvalidValue
 	}

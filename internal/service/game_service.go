@@ -16,6 +16,7 @@ type GameService struct {
 	puzzleProgressRepo repository.PuzzleProgressRepository
 	createGameLimiter  *OperationRateLimiter
 	fillCellsLimiter   *OperationRateLimiter
+	makeMoveLimiter    *OperationRateLimiter
 	verifyGameLimiter  *OperationRateLimiter
 }
 
@@ -27,6 +28,7 @@ func NewGameService(repo repository.GameRepository, puzzleService *PuzzleService
 		puzzleProgressRepo: puzzleProgressRepo,
 		createGameLimiter:  NewOperationRateLimiter(10, 1*time.Minute), // 10 games per minute per guest/IP
 		fillCellsLimiter:   NewOperationRateLimiter(30, 1*time.Minute), // 30 fill operations per minute per guest/IP
+		makeMoveLimiter:    NewOperationRateLimiter(30, 1*time.Minute), // 30 moves per minute per guest/IP
 		verifyGameLimiter:  NewOperationRateLimiter(10, 1*time.Minute), // 10 verifications per minute per guest/IP
 	}
 }
@@ -120,6 +122,112 @@ func (s *GameService) validateAndFillCell(game *domain.Game, cell domain.CellInp
 	return nil
 }
 
+// MakeMove makes a single move - fills a cell and immediately verifies it
+func (s *GameService) MakeMove(ctx context.Context, gameID uuid.UUID, row, col, value int) (*domain.MoveResult, error) {
+	// Check rate limit BEFORE database operation
+	if !s.makeMoveLimiter.AllowGuest(gameID) {
+		return nil, domain.ErrRateLimitExceeded
+	}
+
+	game, err := s.GetByID(ctx, gameID)
+	if err != nil {
+		return nil, err
+	}
+
+	if game.Status == domain.StatusCompleted {
+		return nil, domain.ErrGameAlreadyComplete
+	}
+
+	// Validate and fill the cell
+	cellInput := domain.CellInput{
+		Row:   row,
+		Col:   col,
+		Value: value,
+	}
+
+	if err := s.validateAndFillCell(game, cellInput); err != nil {
+		return nil, err
+	}
+
+	// Verify the cell immediately
+	correctValue := game.GridSolution[row][col]
+	var feedback domain.CellFeedback
+	var isCorrect bool
+
+	if value == correctValue {
+		feedback = domain.FeedbackCorrect
+		isCorrect = true
+	} else if value < correctValue {
+		feedback = domain.FeedbackTooLow
+		isCorrect = false
+		game.TotalMistakes++
+	} else {
+		feedback = domain.FeedbackTooHigh
+		isCorrect = false
+		game.TotalMistakes++
+	}
+
+	// Update cell feedback
+	game.GridCurrent[row][col].Feedback = feedback
+
+	// Check if game is complete (all cells filled correctly)
+	allCorrect := s.checkGameComplete(game)
+	var isGameOver bool
+
+	if allCorrect {
+		game.Status = domain.StatusCompleted
+		isGameOver = true
+
+		// Mark puzzle as completed for this guest
+		if err := s.puzzleProgressRepo.MarkCompleted(ctx, game.GuestID, game.PuzzleID); err != nil {
+			// Log error but don't fail the move
+			// The game is still saved, but progress tracking might have failed
+		}
+	} else {
+		isGameOver = false
+	}
+
+	game.UpdatedAt = time.Now()
+
+	// Save updated game
+	if err := s.repo.Update(ctx, game); err != nil {
+		return nil, err
+	}
+
+	return &domain.MoveResult{
+		Game:          game,
+		IsCorrect:     isCorrect,
+		Feedback:      feedback,
+		TotalMistakes: game.TotalMistakes,
+		IsGameOver:    isGameOver,
+	}, nil
+}
+
+// checkGameComplete checks if all cells are filled correctly
+func (s *GameService) checkGameComplete(game *domain.Game) bool {
+	for i := 0; i < 5; i++ {
+		for j := 0; j < 5; j++ {
+			cell := &game.GridCurrent[i][j]
+
+			// Skip pre-filled cells (they're already correct)
+			if cell.IsPreFilled {
+				continue
+			}
+
+			// Check if cell is filled
+			if cell.Value == nil {
+				return false
+			}
+
+			// Check if value is correct
+			if *cell.Value != game.GridSolution[i][j] {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // VerifyGame verifies all cells in the game
 func (s *GameService) VerifyGame(ctx context.Context, gameID uuid.UUID) (*domain.Game, *domain.VerifyResult, error) {
 	// Check rate limit BEFORE database operation
@@ -207,4 +315,34 @@ func (s *GameService) VerifyGame(ctx context.Context, gameID uuid.UUID) (*domain
 	}
 
 	return game, result, nil
+}
+
+// GetPuzzleStats retrieves statistics for a specific puzzle
+func (s *GameService) GetPuzzleStats(ctx context.Context, puzzleID uuid.UUID) (*domain.PuzzleStats, error) {
+	stats, err := s.repo.GetPuzzleStats(ctx, puzzleID)
+	if err != nil {
+		return nil, err
+	}
+	return stats, nil
+}
+
+// GetPlayerStats retrieves statistics for a specific player
+func (s *GameService) GetPlayerStats(ctx context.Context, guestID uuid.UUID) (*domain.PlayerStats, error) {
+	// Get number of puzzles completed by this guest
+	completedCount, err := s.puzzleProgressRepo.GetCompletedCount(ctx, guestID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get total number of puzzles in the system
+	totalPuzzles, err := s.puzzleService.GetTotalCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.PlayerStats{
+		GuestID:          guestID,
+		PuzzlesCompleted: completedCount,
+		TotalPuzzles:     totalPuzzles,
+	}, nil
 }

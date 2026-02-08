@@ -9,6 +9,12 @@ type Query {
 
   """Get leaderboard entries"""
   leaderboard(limit: Int = 10): [LeaderboardEntry!]!
+
+  """Get statistics for a specific puzzle"""
+  puzzleStats(puzzleId: ID!): PuzzleStats!
+
+  """Get statistics for a specific player"""
+  playerStats(guestId: ID!): PlayerStats!
 }
 
 type Mutation {
@@ -17,6 +23,9 @@ type Mutation {
 
   """Fill cells with values"""
   fillCells(gameId: ID!, cells: [CellInput!]!): Game!
+
+  """Make a move - fill a single cell and immediately verify it"""
+  makeMove(gameId: ID!, row: Int!, col: Int!, value: Int!): MoveResult!
 
   """Verify all cells in the game"""
   verifyGame(gameId: ID!): VerifyResult!
@@ -73,6 +82,15 @@ type VerifyResult {
   mistakesThisRound: Int!
 }
 
+"""Result of making a single move"""
+type MoveResult {
+  game: Game!
+  isCorrect: Boolean!
+  feedback: CellFeedback!
+  totalMistakes: Int!
+  isGameOver: Boolean!
+}
+
 """Verification result for a single cell"""
 type CellVerifyResult {
   row: Int!
@@ -101,4 +119,19 @@ type Puzzle {
   grid: [[Int!]!]!
   solution: [[Int!]!]!
   createdAt: String!
+}
+
+"""Statistics for a specific puzzle"""
+type PuzzleStats {
+  puzzleId: ID!
+  totalPlayers: Int!
+  totalCompleted: Int!
+  averageMistakes: Float!
+}
+
+"""Statistics for a specific player"""
+type PlayerStats {
+  guestId: ID!
+  puzzlesCompleted: Int!
+  totalPuzzles: Int!
 }

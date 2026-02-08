@@ -53,6 +53,18 @@ func (r *puzzleProgressRepository) GetCompletedPuzzles(ctx context.Context, gues
 	return puzzleIDs, nil
 }
 
+func (r *puzzleProgressRepository) GetCompletedCount(ctx context.Context, guestID uuid.UUID) (int, error) {
+	query := `
+		SELECT COUNT(DISTINCT puzzle_id)
+		FROM guest_puzzle_progress
+		WHERE guest_id = $1
+	`
+
+	var count int
+	err := r.db.QueryRow(ctx, query, guestID).Scan(&count)
+	return count, err
+}
+
 func (r *puzzleProgressRepository) HasCompleted(ctx context.Context, guestID, puzzleID uuid.UUID) (bool, error) {
 	query := `
 		SELECT EXISTS(
