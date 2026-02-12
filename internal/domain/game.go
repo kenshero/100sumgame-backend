@@ -33,6 +33,23 @@ const (
 	StatusCompleted GameStatus = "COMPLETED"
 )
 
+// PuzzleStatus represents the status of a puzzle for a guest
+type PuzzleStatus string
+
+const (
+	PuzzleStatusAvailable PuzzleStatus = "AVAILABLE" // Not started yet
+	PuzzleStatusPlaying   PuzzleStatus = "PLAYING"   // Currently playing
+	PuzzleStatusCompleted PuzzleStatus = "COMPLETED" // Completed
+	PuzzleStatusArchived  PuzzleStatus = "ARCHIVED"  // Archived after ad unlock
+	PuzzleStatusAdBlock   PuzzleStatus = "AD_BLOCK"  // Available after watching ad
+)
+
+// PuzzleWithStatus represents a puzzle with its status for a guest
+type PuzzleWithStatus struct {
+	Puzzle *Puzzle
+	Status PuzzleStatus
+}
+
 // Game represents a game session
 type Game struct {
 	ID                 uuid.UUID  `json:"id"`
@@ -53,6 +70,24 @@ type Game struct {
 type Position struct {
 	Row int `json:"row"`
 	Col int `json:"col"`
+}
+
+// GameResult represents game data for public API (excludes sensitive info like GridSolution)
+type GameResult struct {
+	ID            uuid.UUID  `json:"id"`
+	GuestID       uuid.UUID  `json:"guest_id"`
+	PuzzleID      uuid.UUID  `json:"puzzle_id"`
+	GridCurrent   [][]Cell   `json:"grid_current"`
+	TotalMistakes int        `json:"total_mistakes"`
+	Status        GameStatus `json:"status"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+}
+
+// SubmitAnswerResult represents result of submitting multiple answers
+type SubmitAnswerResult struct {
+	Game    *GameResult        `json:"game"`
+	Results []CellVerifyResult `json:"results"`
 }
 
 // CellInput represents input for filling a cell

@@ -11,12 +11,16 @@ import (
 
 // PuzzleService handles puzzle-related business logic
 type PuzzleService struct {
-	repo repository.PuzzleRepository
+	repo               repository.PuzzleRepository
+	PuzzleProgressRepo repository.PuzzleProgressRepository
 }
 
 // NewPuzzleService creates a new puzzle service
-func NewPuzzleService(repo repository.PuzzleRepository) *PuzzleService {
-	return &PuzzleService{repo: repo}
+func NewPuzzleService(repo repository.PuzzleRepository, puzzleProgressRepo repository.PuzzleProgressRepository) *PuzzleService {
+	return &PuzzleService{
+		repo:               repo,
+		PuzzleProgressRepo: puzzleProgressRepo,
+	}
 }
 
 // GetByID retrieves a puzzle by ID
@@ -24,7 +28,7 @@ func (s *PuzzleService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Puzz
 	return s.repo.GetByID(ctx, id)
 }
 
-// GetRandom retrieves a random puzzle from the pool
+// GetRandom retrieves a random puzzle from pool
 func (s *PuzzleService) GetRandom(ctx context.Context) (*domain.Puzzle, error) {
 	puzzle, err := s.repo.GetRandom(ctx)
 	if err != nil {
@@ -33,7 +37,7 @@ func (s *PuzzleService) GetRandom(ctx context.Context) (*domain.Puzzle, error) {
 	return puzzle, nil
 }
 
-// GetRandomForGuest retrieves a random puzzle that the guest hasn't played much
+// GetRandomForGuest retrieves a random puzzle that guest hasn't played much
 // Returns puzzles sorted by least played by this guest
 func (s *PuzzleService) GetRandomForGuest(ctx context.Context, guestID uuid.UUID) (*domain.Puzzle, error) {
 	puzzles, err := s.repo.GetAvailablePuzzlesForGuest(ctx, guestID)
@@ -60,9 +64,29 @@ func (s *PuzzleService) GetAll(ctx context.Context) ([]*domain.Puzzle, error) {
 	return s.repo.GetAll(ctx)
 }
 
-// GetTotalCount retrieves the total number of puzzles
+// GetTotalCount retrieves total number of puzzles
 func (s *PuzzleService) GetTotalCount(ctx context.Context) (int, error) {
 	return s.repo.GetTotalCount(ctx)
+}
+
+// GetAvailableForGuest retrieves all available puzzles for a guest with their status
+// Returns puzzles ordered by ID (not random) with status for each puzzle
+// Limit parameter controls maximum number of puzzles returned
+func (s *PuzzleService) GetAvailableForGuest(ctx context.Context, guestID uuid.UUID, limit int) ([]*domain.PuzzleWithStatus, error) {
+	if limit <= 0 {
+		limit = 20 // Default limit
+	}
+
+	puzzles, err := s.PuzzleProgressRepo.GetAvailablePuzzlesForGuest(ctx, guestID, limit)
+	if err != nil {
+		return nil, domain.ErrNoPuzzlesAvailable
+	}
+
+	if len(puzzles) == 0 {
+		return []*domain.PuzzleWithStatus{}, nil
+	}
+
+	return puzzles, nil
 }
 
 // Create creates a new puzzle

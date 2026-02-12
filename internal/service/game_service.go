@@ -11,25 +11,27 @@ import (
 
 // GameService handles game-related business logic
 type GameService struct {
-	repo               repository.GameRepository
-	puzzleService      *PuzzleService
-	puzzleProgressRepo repository.PuzzleProgressRepository
-	createGameLimiter  *OperationRateLimiter
-	fillCellsLimiter   *OperationRateLimiter
-	makeMoveLimiter    *OperationRateLimiter
-	verifyGameLimiter  *OperationRateLimiter
+	repo                repository.GameRepository
+	puzzleService       *PuzzleService
+	puzzleProgressRepo  repository.PuzzleProgressRepository
+	createGameLimiter   *OperationRateLimiter
+	fillCellsLimiter    *OperationRateLimiter
+	makeMoveLimiter     *OperationRateLimiter
+	verifyGameLimiter   *OperationRateLimiter
+	submitAnswerLimiter *OperationRateLimiter
 }
 
 // NewGameService creates a new game service
 func NewGameService(repo repository.GameRepository, puzzleService *PuzzleService, puzzleProgressRepo repository.PuzzleProgressRepository) *GameService {
 	return &GameService{
-		repo:               repo,
-		puzzleService:      puzzleService,
-		puzzleProgressRepo: puzzleProgressRepo,
-		createGameLimiter:  NewOperationRateLimiter(10, 1*time.Minute), // 10 games per minute per guest/IP
-		fillCellsLimiter:   NewOperationRateLimiter(30, 1*time.Minute), // 30 fill operations per minute per guest/IP
-		makeMoveLimiter:    NewOperationRateLimiter(30, 1*time.Minute), // 30 moves per minute per guest/IP
-		verifyGameLimiter:  NewOperationRateLimiter(10, 1*time.Minute), // 10 verifications per minute per guest/IP
+		repo:                repo,
+		puzzleService:       puzzleService,
+		puzzleProgressRepo:  puzzleProgressRepo,
+		createGameLimiter:   NewOperationRateLimiter(10, 1*time.Minute), // 10 games per minute per guest/IP
+		fillCellsLimiter:    NewOperationRateLimiter(30, 1*time.Minute), // 30 fill operations per minute per guest/IP
+		makeMoveLimiter:     NewOperationRateLimiter(30, 1*time.Minute), // 30 moves per minute per guest/IP
+		verifyGameLimiter:   NewOperationRateLimiter(10, 1*time.Minute), // 10 verifications per minute per guest/IP
+		submitAnswerLimiter: NewOperationRateLimiter(30, 1*time.Minute), // 30 submissions per minute per guest/IP
 	}
 }
 
@@ -345,4 +347,107 @@ func (s *GameService) GetPlayerStats(ctx context.Context, guestID uuid.UUID) (*d
 		PuzzlesCompleted: completedCount,
 		TotalPuzzles:     totalPuzzles,
 	}, nil
+}
+
+// SubmitAnswer submits multiple answers for a specific puzzle
+func (s *GameService) SubmitAnswer(ctx context.Context, guestID, puzzleID uuid.UUID, answers []domain.CellInput) (*domain.SubmitAnswerResult, error) {
+	// Check rate limit BEFORE database operation
+	if !s.submitAnswerLimiter.AllowGuest(guestID) {
+		return nil, domain.ErrRateLimitExceeded
+	}
+
+	// Try to find existing game session for this guest + puzzle
+	game, err := s.repo.GetByGuestAndPuzzle(ctx, guestID, puzzleID)
+
+	// If no game session exists, create a new one
+	if err != nil {
+		// Get puzzle data
+		puzzle, err := s.puzzleService.GetByID(ctx, puzzleID)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create new game session
+		game = domain.NewGame(puzzle, guestID)
+		if err := s.repo.Create(ctx, game); err != nil {
+			return nil, err
+		}
+	}
+
+	// Check if game is already completed
+	if game.Status == domain.StatusCompleted {
+		return nil, domain.ErrGameAlreadyComplete
+	}
+
+	// Process each answer
+	result := &domain.SubmitAnswerResult{
+		Results: make([]domain.CellVerifyResult, 0),
+	}
+
+	for _, answer := range answers {
+		// Validate and fill cell
+		if err := s.validateAndFillCell(game, answer); err != nil {
+			return nil, err
+		}
+
+		// Verify the cell against solution
+		correctValue := game.GridSolution[answer.Row][answer.Col]
+		currentValue := answer.Value
+
+		var feedback domain.CellFeedback
+		if currentValue == correctValue {
+			feedback = domain.FeedbackCorrect
+		} else {
+			if currentValue < correctValue {
+				feedback = domain.FeedbackTooLow
+				game.TotalMistakes++
+			} else {
+				feedback = domain.FeedbackTooHigh
+				game.TotalMistakes++
+			}
+		}
+
+		// Update cell feedback
+		game.GridCurrent[answer.Row][answer.Col].Feedback = feedback
+
+		// Add to results
+		result.Results = append(result.Results, domain.CellVerifyResult{
+			Row:      answer.Row,
+			Col:      answer.Col,
+			Feedback: feedback,
+		})
+	}
+
+	game.UpdatedAt = time.Now()
+
+	// Check if all cells are now correct and complete
+	if s.checkGameComplete(game) {
+		game.Status = domain.StatusCompleted
+
+		// Mark puzzle as completed for this guest
+		if err := s.puzzleProgressRepo.MarkCompleted(ctx, guestID, puzzleID); err != nil {
+			// Log error but don't fail the submission
+			// The game is still saved, but progress tracking might have failed
+		}
+	}
+
+	// Save updated game
+	if err := s.repo.Update(ctx, game); err != nil {
+		return nil, err
+	}
+
+	// Create game result (without solution)
+	gameResult := &domain.GameResult{
+		ID:            game.ID,
+		GuestID:       game.GuestID,
+		PuzzleID:      game.PuzzleID,
+		GridCurrent:   game.GridCurrent,
+		TotalMistakes: game.TotalMistakes,
+		Status:        game.Status,
+		CreatedAt:     game.CreatedAt,
+		UpdatedAt:     game.UpdatedAt,
+	}
+
+	result.Game = gameResult
+	return result, nil
 }

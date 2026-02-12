@@ -68,7 +68,42 @@ func domainPuzzleToModel(puzzle *domain.Puzzle) *model.Puzzle {
 	return &model.Puzzle{
 		ID:        puzzle.ID.String(),
 		Grid:      grid,
-		Solution:  puzzle.GridSolution,
 		CreatedAt: puzzle.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+}
+
+// Helper function to convert domain grid to GraphQL model grid
+func domainGridToModel(grid [][]domain.Cell) [][]*model.Cell {
+	modelGrid := make([][]*model.Cell, len(grid))
+	for i, row := range grid {
+		modelGrid[i] = make([]*model.Cell, len(row))
+		for j, cell := range row {
+			var feedback *model.CellFeedback
+			if cell.Feedback != "" {
+				f := model.CellFeedback(cell.Feedback)
+				feedback = &f
+			}
+
+			modelGrid[i][j] = &model.Cell{
+				Row:         cell.Row,
+				Col:         cell.Col,
+				Value:       cell.Value,
+				IsPreFilled: cell.IsPreFilled,
+				Feedback:    feedback,
+			}
+		}
+	}
+	return modelGrid
+}
+
+// Helper function to convert domain PuzzleWithStatus to GraphQL model PuzzleWithStatus
+func domainPuzzleWithStatusToModel(puzzleWithStatus *domain.PuzzleWithStatus) *model.PuzzleWithStatus {
+	puzzle := puzzleWithStatus.Puzzle
+	puzzleModel := domainPuzzleToModel(puzzle)
+	status := model.PuzzleStatus(puzzleWithStatus.Status)
+
+	return &model.PuzzleWithStatus{
+		Puzzle: puzzleModel,
+		Status: status,
 	}
 }

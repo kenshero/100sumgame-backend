@@ -4,6 +4,9 @@ type Query {
   """Get a game by ID"""
   game(id: ID!): Game
 
+  """Get available puzzles for a guest with their status"""
+  getAvailablePuzzles(guestId: ID!, limit: Int = 20): [PuzzleWithStatus!]!
+
   """Get all puzzles from puzzle pool"""
   puzzles: [Puzzle!]!
 
@@ -30,8 +33,14 @@ type Mutation {
   """Verify all cells in the game"""
   verifyGame(gameId: ID!): VerifyResult!
 
+  """Submit multiple answers for a puzzle"""
+  submitAnswer(guestId: ID!, puzzleId: ID!, answers: [CellInput!]!): SubmitAnswerResult!
+
   """Complete the game and submit to leaderboard"""
   completeGame(gameId: ID!, guestId: ID!, username: String!): CompleteGameResult!
+
+  """Unlock new puzzles after watching ad - Archives completed puzzles and unlocks AD_BLOCK puzzles"""
+  unlockPuzzlesAfterAd(guestId: ID!): Boolean!
 }
 
 """Game represents a game session"""
@@ -107,18 +116,57 @@ type LeaderboardEntry {
   createdAt: String!
 }
 
+"""Result of submitting multiple answers"""
+type SubmitAnswerResult {
+  game: GameResult!
+  results: [CellVerifyResult!]!
+}
+
+"""Game result for public API (excludes GridSolution)"""
+type GameResult {
+  id: ID!
+  guestId: ID!
+  puzzleId: ID!
+  gridCurrent: [[Cell!]!]!
+  totalMistakes: Int!
+  status: GameStatus!
+  createdAt: String!
+  updatedAt: String!
+}
+
 """Result of completing a game"""
 type CompleteGameResult {
   entry: LeaderboardEntry!
   rank: Int!
 }
 
+"""Position in grid"""
+type Position {
+  row: Int!
+  col: Int!
+}
 """Puzzle from puzzle pool"""
 type Puzzle {
   id: ID!
   grid: [[Int!]!]!
-  solution: [[Int!]!]!
+  prefilledPositions: [Position!]!
+  difficulty: String
   createdAt: String!
+}
+
+"""Puzzle with status for a guest"""
+type PuzzleWithStatus {
+  puzzle: Puzzle!
+  status: PuzzleStatus!
+}
+
+"""Puzzle status enum"""
+enum PuzzleStatus {
+  AVAILABLE
+  PLAYING
+  COMPLETED
+  ARCHIVED
+  AD_BLOCK
 }
 
 """Statistics for a specific puzzle"""

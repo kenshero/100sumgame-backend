@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/kenshero/100sumgame/internal/domain"
 )
 
 type puzzleProgressRepository struct {
@@ -76,4 +77,83 @@ func (r *puzzleProgressRepository) HasCompleted(ctx context.Context, guestID, pu
 	var completed bool
 	err := r.db.QueryRow(ctx, query, guestID, puzzleID).Scan(&completed)
 	return completed, err
+}
+
+// GetAvailablePuzzlesForGuest gets puzzles with their status for a guest
+func (r *puzzleProgressRepository) GetAvailablePuzzlesForGuest(ctx context.Context, guestID uuid.UUID, limit int) ([]*domain.PuzzleWithStatus, error) {
+	query := `
+		WITH all_puzzles AS (
+			SELECT id, grid_solution, prefilled_positions, created_at
+			FROM puzzle_pool
+			ORDER BY id ASC
+			LIMIT $1
+		),
+		guest_progress AS (
+			SELECT puzzle_id, status
+			FROM guest_puzzle_progress
+			WHERE guest_id = $2
+		)
+		SELECT 
+			ap.id,
+			ap.grid_solution,
+			ap.prefilled_positions,
+			ap.created_at,
+			COALESCE(gp.status, 'AVAILABLE') as status
+		FROM all_puzzles ap
+		LEFT JOIN guest_progress gp ON ap.id = gp.puzzle_id
+	`
+
+	rows, err := r.db.Query(ctx, query, limit, guestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var puzzles []*domain.PuzzleWithStatus
+	for rows.Next() {
+		var p domain.PuzzleWithStatus
+		var puzzle domain.Puzzle
+		var status string
+
+		err := rows.Scan(
+			&puzzle.ID,
+			&puzzle.GridSolution,
+			&puzzle.PrefilledPositions,
+			&puzzle.CreatedAt,
+			&status,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		p.Puzzle = &puzzle
+		p.Status = domain.PuzzleStatus(status)
+		puzzles = append(puzzles, &p)
+	}
+
+	return puzzles, nil
+}
+
+// MarkArchived marks all COMPLETED puzzles as ARCHIVED for a guest
+func (r *puzzleProgressRepository) MarkArchived(ctx context.Context, guestID uuid.UUID) error {
+	query := `
+		UPDATE guest_puzzle_progress
+		SET status = 'ARCHIVED'
+		WHERE guest_id = $1 AND status = 'COMPLETED'
+	`
+
+	_, err := r.db.Exec(ctx, query, guestID)
+	return err
+}
+
+// MarkAvailable marks all AD_BLOCK puzzles as AVAILABLE for a guest
+func (r *puzzleProgressRepository) MarkAvailable(ctx context.Context, guestID uuid.UUID) error {
+	query := `
+		UPDATE guest_puzzle_progress
+		SET status = 'AVAILABLE'
+		WHERE guest_id = $1 AND status = 'AD_BLOCK'
+	`
+
+	_, err := r.db.Exec(ctx, query, guestID)
+	return err
 }

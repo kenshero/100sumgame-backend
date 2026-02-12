@@ -20,6 +20,7 @@ type PuzzleRepository interface {
 // GameRepository defines the interface for game data access
 type GameRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Game, error)
+	GetByGuestAndPuzzle(ctx context.Context, guestID, puzzleID uuid.UUID) (*domain.Game, error)
 	Create(ctx context.Context, game *domain.Game) error
 	Update(ctx context.Context, game *domain.Game) error
 	Delete(ctx context.Context, id uuid.UUID) error
@@ -39,4 +40,9 @@ type PuzzleProgressRepository interface {
 	GetCompletedPuzzles(ctx context.Context, guestID uuid.UUID) ([]uuid.UUID, error)
 	GetCompletedCount(ctx context.Context, guestID uuid.UUID) (int, error)
 	HasCompleted(ctx context.Context, guestID, puzzleID uuid.UUID) (bool, error)
+
+	// New methods for ad reward system
+	GetAvailablePuzzlesForGuest(ctx context.Context, guestID uuid.UUID, limit int) ([]*domain.PuzzleWithStatus, error)
+	MarkArchived(ctx context.Context, guestID uuid.UUID) error
+	MarkAvailable(ctx context.Context, guestID uuid.UUID) error
 }

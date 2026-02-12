@@ -63,6 +63,53 @@ func (r *gameRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Gam
 	return &game, nil
 }
 
+func (r *gameRepository) GetByGuestAndPuzzle(ctx context.Context, guestID, puzzleID uuid.UUID) (*domain.Game, error) {
+	query := `
+		SELECT id, guest_id, puzzle_id, grid_current, grid_solution, prefilled_positions,
+		       total_mistakes, tokens_used, tokens_limit, status, created_at, updated_at
+		FROM game_sessions
+		WHERE guest_id = $1 AND puzzle_id = $2
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`
+
+	var game domain.Game
+	var gridCurrentJSON, gridSolutionJSON, positionsJSON []byte
+	var status string
+
+	err := r.db.QueryRow(ctx, query, guestID, puzzleID).Scan(
+		&game.ID,
+		&game.GuestID,
+		&game.PuzzleID,
+		&gridCurrentJSON,
+		&gridSolutionJSON,
+		&positionsJSON,
+		&game.TotalMistakes,
+		&game.TokensUsed,
+		&game.TokensLimit,
+		&status,
+		&game.CreatedAt,
+		&game.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	game.Status = domain.GameStatus(status)
+
+	if err := json.Unmarshal(gridCurrentJSON, &game.GridCurrent); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(gridSolutionJSON, &game.GridSolution); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(positionsJSON, &game.PrefilledPositions); err != nil {
+		return nil, err
+	}
+
+	return &game, nil
+}
+
 func (r *gameRepository) Create(ctx context.Context, game *domain.Game) error {
 	query := `
 		INSERT INTO game_sessions (id, guest_id, puzzle_id, grid_current, grid_solution, prefilled_positions,

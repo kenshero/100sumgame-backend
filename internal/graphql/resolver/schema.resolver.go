@@ -115,6 +115,71 @@ func (r *mutationResolver) VerifyGame(ctx context.Context, gameID string) (*mode
 	}, nil
 }
 
+// SubmitAnswer is the resolver for the submitAnswer field.
+func (r *mutationResolver) SubmitAnswer(ctx context.Context, guestID string, puzzleID string, answers []*model.CellInput) (*model.SubmitAnswerResult, error) {
+	// Get session from context
+	session := middleware.GetSessionFromContext(ctx)
+	if session == nil {
+		return nil, fmt.Errorf("session not found")
+	}
+
+	// Parse guest ID from session (ignore the guestID parameter from client)
+	guestUUID, err := uuid.Parse(session.GuestID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse puzzle ID
+	puzzleUUID, err := uuid.Parse(puzzleID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert answers to domain
+	domainAnswers := make([]domain.CellInput, len(answers))
+	for i, answer := range answers {
+		domainAnswers[i] = domain.CellInput{
+			Row:   answer.Row,
+			Col:   answer.Col,
+			Value: answer.Value,
+		}
+	}
+
+	// Submit answers
+	result, err := r.GameService.SubmitAnswer(ctx, guestUUID, puzzleUUID, domainAnswers)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert results
+	cellResults := make([]*model.CellVerifyResult, len(result.Results))
+	for i, r := range result.Results {
+		feedback := model.CellFeedback(r.Feedback)
+		cellResults[i] = &model.CellVerifyResult{
+			Row:      r.Row,
+			Col:      r.Col,
+			Feedback: feedback,
+		}
+	}
+
+	// Convert game result
+	gameResult := &model.GameResult{
+		ID:            result.Game.ID.String(),
+		GuestID:       result.Game.GuestID.String(),
+		PuzzleID:      result.Game.PuzzleID.String(),
+		GridCurrent:   domainGridToModel(result.Game.GridCurrent),
+		TotalMistakes: result.Game.TotalMistakes,
+		Status:        model.GameStatus(result.Game.Status),
+		CreatedAt:     result.Game.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:     result.Game.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+
+	return &model.SubmitAnswerResult{
+		Game:    gameResult,
+		Results: cellResults,
+	}, nil
+}
+
 // CompleteGame mutation resolver
 func (r *mutationResolver) CompleteGame(ctx context.Context, gameID string, guestID string, username string) (*model.CompleteGameResult, error) {
 	// Get session from context
@@ -156,6 +221,33 @@ func (r *mutationResolver) CompleteGame(ctx context.Context, gameID string, gues
 	}, nil
 }
 
+// UnlockPuzzlesAfterAd is the resolver for the unlockPuzzlesAfterAd field.
+func (r *mutationResolver) UnlockPuzzlesAfterAd(ctx context.Context, guestID string) (bool, error) {
+	// Get session from context
+	session := middleware.GetSessionFromContext(ctx)
+	if session == nil {
+		return false, fmt.Errorf("session not found")
+	}
+
+	// Parse guest ID from session (ignore the guestID parameter from client)
+	guestUUID, err := uuid.Parse(session.GuestID)
+	if err != nil {
+		return false, err
+	}
+
+	// Mark all COMPLETED puzzles as ARCHIVED
+	if err := r.PuzzleService.PuzzleProgressRepo.MarkArchived(ctx, guestUUID); err != nil {
+		return false, fmt.Errorf("failed to archive completed puzzles: %w", err)
+	}
+
+	// Mark all AD_BLOCK puzzles as AVAILABLE
+	if err := r.PuzzleService.PuzzleProgressRepo.MarkAvailable(ctx, guestUUID); err != nil {
+		return false, fmt.Errorf("failed to unlock ad-block puzzles: %w", err)
+	}
+
+	return true, nil
+}
+
 // Game query resolver
 func (r *queryResolver) Game(ctx context.Context, id string) (*model.Game, error) {
 	gameID, err := uuid.Parse(id)
@@ -169,6 +261,41 @@ func (r *queryResolver) Game(ctx context.Context, id string) (*model.Game, error
 	}
 
 	return domainGameToModel(game), nil
+}
+
+// GetAvailablePuzzles is the resolver for the getAvailablePuzzles field.
+func (r *queryResolver) GetAvailablePuzzles(ctx context.Context, guestID string, limit *int) ([]*model.PuzzleWithStatus, error) {
+	// Get session from context
+	session := middleware.GetSessionFromContext(ctx)
+	if session == nil {
+		return nil, fmt.Errorf("session not found")
+	}
+
+	// Parse guest ID from session (ignore the guestID parameter from client)
+	guestUUID, err := uuid.Parse(session.GuestID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set default limit
+	l := 20
+	if limit != nil {
+		l = *limit
+	}
+
+	// Get available puzzles for this guest with their status
+	puzzles, err := r.PuzzleService.GetAvailableForGuest(ctx, guestUUID, l)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to model
+	result := make([]*model.PuzzleWithStatus, len(puzzles))
+	for i, puzzle := range puzzles {
+		result[i] = domainPuzzleWithStatusToModel(puzzle)
+	}
+
+	return result, nil
 }
 
 // Puzzles query resolver - Get all puzzles from puzzle pool

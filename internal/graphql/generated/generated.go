@@ -75,6 +75,17 @@ type ComplexityRoot struct {
 		TotalMistakes func(childComplexity int) int
 	}
 
+	GameResult struct {
+		CreatedAt     func(childComplexity int) int
+		GridCurrent   func(childComplexity int) int
+		GuestID       func(childComplexity int) int
+		ID            func(childComplexity int) int
+		PuzzleID      func(childComplexity int) int
+		Status        func(childComplexity int) int
+		TotalMistakes func(childComplexity int) int
+		UpdatedAt     func(childComplexity int) int
+	}
+
 	LeaderboardEntry struct {
 		CreatedAt func(childComplexity int) int
 		GuestID   func(childComplexity int) int
@@ -92,11 +103,13 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CompleteGame func(childComplexity int, gameID string, guestID string, username string) int
-		CreateGame   func(childComplexity int, guestID string) int
-		FillCells    func(childComplexity int, gameID string, cells []*model.CellInput) int
-		MakeMove     func(childComplexity int, gameID string, row int, col int, value int) int
-		VerifyGame   func(childComplexity int, gameID string) int
+		CompleteGame         func(childComplexity int, gameID string, guestID string, username string) int
+		CreateGame           func(childComplexity int, guestID string) int
+		FillCells            func(childComplexity int, gameID string, cells []*model.CellInput) int
+		MakeMove             func(childComplexity int, gameID string, row int, col int, value int) int
+		SubmitAnswer         func(childComplexity int, guestID string, puzzleID string, answers []*model.CellInput) int
+		UnlockPuzzlesAfterAd func(childComplexity int, guestID string) int
+		VerifyGame           func(childComplexity int, gameID string) int
 	}
 
 	PlayerStats struct {
@@ -105,11 +118,17 @@ type ComplexityRoot struct {
 		TotalPuzzles     func(childComplexity int) int
 	}
 
+	Position struct {
+		Col func(childComplexity int) int
+		Row func(childComplexity int) int
+	}
+
 	Puzzle struct {
-		CreatedAt func(childComplexity int) int
-		Grid      func(childComplexity int) int
-		ID        func(childComplexity int) int
-		Solution  func(childComplexity int) int
+		CreatedAt          func(childComplexity int) int
+		Difficulty         func(childComplexity int) int
+		Grid               func(childComplexity int) int
+		ID                 func(childComplexity int) int
+		PrefilledPositions func(childComplexity int) int
 	}
 
 	PuzzleStats struct {
@@ -119,12 +138,23 @@ type ComplexityRoot struct {
 		TotalPlayers    func(childComplexity int) int
 	}
 
+	PuzzleWithStatus struct {
+		Puzzle func(childComplexity int) int
+		Status func(childComplexity int) int
+	}
+
 	Query struct {
-		Game        func(childComplexity int, id string) int
-		Leaderboard func(childComplexity int, limit *int) int
-		PlayerStats func(childComplexity int, guestID string) int
-		PuzzleStats func(childComplexity int, puzzleID string) int
-		Puzzles     func(childComplexity int) int
+		Game                func(childComplexity int, id string) int
+		GetAvailablePuzzles func(childComplexity int, guestID string, limit *int) int
+		Leaderboard         func(childComplexity int, limit *int) int
+		PlayerStats         func(childComplexity int, guestID string) int
+		PuzzleStats         func(childComplexity int, puzzleID string) int
+		Puzzles             func(childComplexity int) int
+	}
+
+	SubmitAnswerResult struct {
+		Game    func(childComplexity int) int
+		Results func(childComplexity int) int
 	}
 
 	VerifyResult struct {
@@ -140,10 +170,13 @@ type MutationResolver interface {
 	FillCells(ctx context.Context, gameID string, cells []*model.CellInput) (*model.Game, error)
 	MakeMove(ctx context.Context, gameID string, row int, col int, value int) (*model.MoveResult, error)
 	VerifyGame(ctx context.Context, gameID string) (*model.VerifyResult, error)
+	SubmitAnswer(ctx context.Context, guestID string, puzzleID string, answers []*model.CellInput) (*model.SubmitAnswerResult, error)
 	CompleteGame(ctx context.Context, gameID string, guestID string, username string) (*model.CompleteGameResult, error)
+	UnlockPuzzlesAfterAd(ctx context.Context, guestID string) (bool, error)
 }
 type QueryResolver interface {
 	Game(ctx context.Context, id string) (*model.Game, error)
+	GetAvailablePuzzles(ctx context.Context, guestID string, limit *int) ([]*model.PuzzleWithStatus, error)
 	Puzzles(ctx context.Context) ([]*model.Puzzle, error)
 	Leaderboard(ctx context.Context, limit *int) ([]*model.LeaderboardEntry, error)
 	PuzzleStats(ctx context.Context, puzzleID string) (*model.PuzzleStats, error)
@@ -275,6 +308,55 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Game.TotalMistakes(childComplexity), true
 
+	case "GameResult.createdAt":
+		if e.complexity.GameResult.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.GameResult.CreatedAt(childComplexity), true
+	case "GameResult.gridCurrent":
+		if e.complexity.GameResult.GridCurrent == nil {
+			break
+		}
+
+		return e.complexity.GameResult.GridCurrent(childComplexity), true
+	case "GameResult.guestId":
+		if e.complexity.GameResult.GuestID == nil {
+			break
+		}
+
+		return e.complexity.GameResult.GuestID(childComplexity), true
+	case "GameResult.id":
+		if e.complexity.GameResult.ID == nil {
+			break
+		}
+
+		return e.complexity.GameResult.ID(childComplexity), true
+	case "GameResult.puzzleId":
+		if e.complexity.GameResult.PuzzleID == nil {
+			break
+		}
+
+		return e.complexity.GameResult.PuzzleID(childComplexity), true
+	case "GameResult.status":
+		if e.complexity.GameResult.Status == nil {
+			break
+		}
+
+		return e.complexity.GameResult.Status(childComplexity), true
+	case "GameResult.totalMistakes":
+		if e.complexity.GameResult.TotalMistakes == nil {
+			break
+		}
+
+		return e.complexity.GameResult.TotalMistakes(childComplexity), true
+	case "GameResult.updatedAt":
+		if e.complexity.GameResult.UpdatedAt == nil {
+			break
+		}
+
+		return e.complexity.GameResult.UpdatedAt(childComplexity), true
+
 	case "LeaderboardEntry.createdAt":
 		if e.complexity.LeaderboardEntry.CreatedAt == nil {
 			break
@@ -381,6 +463,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.MakeMove(childComplexity, args["gameId"].(string), args["row"].(int), args["col"].(int), args["value"].(int)), true
+	case "Mutation.submitAnswer":
+		if e.complexity.Mutation.SubmitAnswer == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_submitAnswer_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SubmitAnswer(childComplexity, args["guestId"].(string), args["puzzleId"].(string), args["answers"].([]*model.CellInput)), true
+	case "Mutation.unlockPuzzlesAfterAd":
+		if e.complexity.Mutation.UnlockPuzzlesAfterAd == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_unlockPuzzlesAfterAd_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UnlockPuzzlesAfterAd(childComplexity, args["guestId"].(string)), true
 	case "Mutation.verifyGame":
 		if e.complexity.Mutation.VerifyGame == nil {
 			break
@@ -412,12 +516,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.PlayerStats.TotalPuzzles(childComplexity), true
 
+	case "Position.col":
+		if e.complexity.Position.Col == nil {
+			break
+		}
+
+		return e.complexity.Position.Col(childComplexity), true
+	case "Position.row":
+		if e.complexity.Position.Row == nil {
+			break
+		}
+
+		return e.complexity.Position.Row(childComplexity), true
+
 	case "Puzzle.createdAt":
 		if e.complexity.Puzzle.CreatedAt == nil {
 			break
 		}
 
 		return e.complexity.Puzzle.CreatedAt(childComplexity), true
+	case "Puzzle.difficulty":
+		if e.complexity.Puzzle.Difficulty == nil {
+			break
+		}
+
+		return e.complexity.Puzzle.Difficulty(childComplexity), true
 	case "Puzzle.grid":
 		if e.complexity.Puzzle.Grid == nil {
 			break
@@ -430,12 +553,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Puzzle.ID(childComplexity), true
-	case "Puzzle.solution":
-		if e.complexity.Puzzle.Solution == nil {
+	case "Puzzle.prefilledPositions":
+		if e.complexity.Puzzle.PrefilledPositions == nil {
 			break
 		}
 
-		return e.complexity.Puzzle.Solution(childComplexity), true
+		return e.complexity.Puzzle.PrefilledPositions(childComplexity), true
 
 	case "PuzzleStats.averageMistakes":
 		if e.complexity.PuzzleStats.AverageMistakes == nil {
@@ -462,6 +585,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.PuzzleStats.TotalPlayers(childComplexity), true
 
+	case "PuzzleWithStatus.puzzle":
+		if e.complexity.PuzzleWithStatus.Puzzle == nil {
+			break
+		}
+
+		return e.complexity.PuzzleWithStatus.Puzzle(childComplexity), true
+	case "PuzzleWithStatus.status":
+		if e.complexity.PuzzleWithStatus.Status == nil {
+			break
+		}
+
+		return e.complexity.PuzzleWithStatus.Status(childComplexity), true
+
 	case "Query.game":
 		if e.complexity.Query.Game == nil {
 			break
@@ -473,6 +609,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Game(childComplexity, args["id"].(string)), true
+	case "Query.getAvailablePuzzles":
+		if e.complexity.Query.GetAvailablePuzzles == nil {
+			break
+		}
+
+		args, err := ec.field_Query_getAvailablePuzzles_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.GetAvailablePuzzles(childComplexity, args["guestId"].(string), args["limit"].(*int)), true
 	case "Query.leaderboard":
 		if e.complexity.Query.Leaderboard == nil {
 			break
@@ -512,6 +659,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Puzzles(childComplexity), true
+
+	case "SubmitAnswerResult.game":
+		if e.complexity.SubmitAnswerResult.Game == nil {
+			break
+		}
+
+		return e.complexity.SubmitAnswerResult.Game(childComplexity), true
+	case "SubmitAnswerResult.results":
+		if e.complexity.SubmitAnswerResult.Results == nil {
+			break
+		}
+
+		return e.complexity.SubmitAnswerResult.Results(childComplexity), true
 
 	case "VerifyResult.allCorrect":
 		if e.complexity.VerifyResult.AllCorrect == nil {
@@ -650,6 +810,9 @@ type Query {
   """Get a game by ID"""
   game(id: ID!): Game
 
+  """Get available puzzles for a guest with their status"""
+  getAvailablePuzzles(guestId: ID!, limit: Int = 20): [PuzzleWithStatus!]!
+
   """Get all puzzles from puzzle pool"""
   puzzles: [Puzzle!]!
 
@@ -676,8 +839,14 @@ type Mutation {
   """Verify all cells in the game"""
   verifyGame(gameId: ID!): VerifyResult!
 
+  """Submit multiple answers for a puzzle"""
+  submitAnswer(guestId: ID!, puzzleId: ID!, answers: [CellInput!]!): SubmitAnswerResult!
+
   """Complete the game and submit to leaderboard"""
   completeGame(gameId: ID!, guestId: ID!, username: String!): CompleteGameResult!
+
+  """Unlock new puzzles after watching ad - Archives completed puzzles and unlocks AD_BLOCK puzzles"""
+  unlockPuzzlesAfterAd(guestId: ID!): Boolean!
 }
 
 """Game represents a game session"""
@@ -753,18 +922,57 @@ type LeaderboardEntry {
   createdAt: String!
 }
 
+"""Result of submitting multiple answers"""
+type SubmitAnswerResult {
+  game: GameResult!
+  results: [CellVerifyResult!]!
+}
+
+"""Game result for public API (excludes GridSolution)"""
+type GameResult {
+  id: ID!
+  guestId: ID!
+  puzzleId: ID!
+  gridCurrent: [[Cell!]!]!
+  totalMistakes: Int!
+  status: GameStatus!
+  createdAt: String!
+  updatedAt: String!
+}
+
 """Result of completing a game"""
 type CompleteGameResult {
   entry: LeaderboardEntry!
   rank: Int!
 }
 
+"""Position in grid"""
+type Position {
+  row: Int!
+  col: Int!
+}
 """Puzzle from puzzle pool"""
 type Puzzle {
   id: ID!
   grid: [[Int!]!]!
-  solution: [[Int!]!]!
+  prefilledPositions: [Position!]!
+  difficulty: String
   createdAt: String!
+}
+
+"""Puzzle with status for a guest"""
+type PuzzleWithStatus {
+  puzzle: Puzzle!
+  status: PuzzleStatus!
+}
+
+"""Puzzle status enum"""
+enum PuzzleStatus {
+  AVAILABLE
+  PLAYING
+  COMPLETED
+  ARCHIVED
+  AD_BLOCK
 }
 
 """Statistics for a specific puzzle"""
@@ -863,6 +1071,38 @@ func (ec *executionContext) field_Mutation_makeMove_args(ctx context.Context, ra
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_submitAnswer_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "guestId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["guestId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "puzzleId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["puzzleId"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "answers", ec.unmarshalNCellInput2ᚕᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐCellInputᚄ)
+	if err != nil {
+		return nil, err
+	}
+	args["answers"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_unlockPuzzlesAfterAd_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "guestId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["guestId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_verifyGame_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -893,6 +1133,22 @@ func (ec *executionContext) field_Query_game_args(ctx context.Context, rawArgs m
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_getAvailablePuzzles_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "guestId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["guestId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg1
 	return args, nil
 }
 
@@ -1498,6 +1754,250 @@ func (ec *executionContext) fieldContext_Game_createdAt(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _GameResult_id(ctx context.Context, field graphql.CollectedField, obj *model.GameResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameResult_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameResult_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GameResult_guestId(ctx context.Context, field graphql.CollectedField, obj *model.GameResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameResult_guestId,
+		func(ctx context.Context) (any, error) {
+			return obj.GuestID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameResult_guestId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GameResult_puzzleId(ctx context.Context, field graphql.CollectedField, obj *model.GameResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameResult_puzzleId,
+		func(ctx context.Context) (any, error) {
+			return obj.PuzzleID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameResult_puzzleId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GameResult_gridCurrent(ctx context.Context, field graphql.CollectedField, obj *model.GameResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameResult_gridCurrent,
+		func(ctx context.Context) (any, error) {
+			return obj.GridCurrent, nil
+		},
+		nil,
+		ec.marshalNCell2ᚕᚕᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐCellᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameResult_gridCurrent(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "row":
+				return ec.fieldContext_Cell_row(ctx, field)
+			case "col":
+				return ec.fieldContext_Cell_col(ctx, field)
+			case "value":
+				return ec.fieldContext_Cell_value(ctx, field)
+			case "isPreFilled":
+				return ec.fieldContext_Cell_isPreFilled(ctx, field)
+			case "feedback":
+				return ec.fieldContext_Cell_feedback(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Cell", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GameResult_totalMistakes(ctx context.Context, field graphql.CollectedField, obj *model.GameResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameResult_totalMistakes,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalMistakes, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameResult_totalMistakes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GameResult_status(ctx context.Context, field graphql.CollectedField, obj *model.GameResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameResult_status,
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		ec.marshalNGameStatus2githubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐGameStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameResult_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type GameStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GameResult_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.GameResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameResult_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameResult_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GameResult_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.GameResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameResult_updatedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameResult_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _LeaderboardEntry_id(ctx context.Context, field graphql.CollectedField, obj *model.LeaderboardEntry) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2022,6 +2522,53 @@ func (ec *executionContext) fieldContext_Mutation_verifyGame(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_submitAnswer(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_submitAnswer,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().SubmitAnswer(ctx, fc.Args["guestId"].(string), fc.Args["puzzleId"].(string), fc.Args["answers"].([]*model.CellInput))
+		},
+		nil,
+		ec.marshalNSubmitAnswerResult2ᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐSubmitAnswerResult,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_submitAnswer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "game":
+				return ec.fieldContext_SubmitAnswerResult_game(ctx, field)
+			case "results":
+				return ec.fieldContext_SubmitAnswerResult_results(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SubmitAnswerResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_submitAnswer_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_completeGame(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2063,6 +2610,47 @@ func (ec *executionContext) fieldContext_Mutation_completeGame(ctx context.Conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_completeGame_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_unlockPuzzlesAfterAd(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_unlockPuzzlesAfterAd,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().UnlockPuzzlesAfterAd(ctx, fc.Args["guestId"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_unlockPuzzlesAfterAd(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_unlockPuzzlesAfterAd_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -2156,6 +2744,64 @@ func (ec *executionContext) fieldContext_PlayerStats_totalPuzzles(_ context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Position_row(ctx context.Context, field graphql.CollectedField, obj *model.Position) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Position_row,
+		func(ctx context.Context) (any, error) {
+			return obj.Row, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Position_row(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Position",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Position_col(ctx context.Context, field graphql.CollectedField, obj *model.Position) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Position_col,
+		func(ctx context.Context) (any, error) {
+			return obj.Col, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Position_col(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Position",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Puzzle_id(ctx context.Context, field graphql.CollectedField, obj *model.Puzzle) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2214,30 +2860,65 @@ func (ec *executionContext) fieldContext_Puzzle_grid(_ context.Context, field gr
 	return fc, nil
 }
 
-func (ec *executionContext) _Puzzle_solution(ctx context.Context, field graphql.CollectedField, obj *model.Puzzle) (ret graphql.Marshaler) {
+func (ec *executionContext) _Puzzle_prefilledPositions(ctx context.Context, field graphql.CollectedField, obj *model.Puzzle) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_Puzzle_solution,
+		ec.fieldContext_Puzzle_prefilledPositions,
 		func(ctx context.Context) (any, error) {
-			return obj.Solution, nil
+			return obj.PrefilledPositions, nil
 		},
 		nil,
-		ec.marshalNInt2ᚕᚕintᚄ,
+		ec.marshalNPosition2ᚕᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐPositionᚄ,
 		true,
 		true,
 	)
 }
 
-func (ec *executionContext) fieldContext_Puzzle_solution(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Puzzle_prefilledPositions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Puzzle",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
+			switch field.Name {
+			case "row":
+				return ec.fieldContext_Position_row(ctx, field)
+			case "col":
+				return ec.fieldContext_Position_col(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Position", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Puzzle_difficulty(ctx context.Context, field graphql.CollectedField, obj *model.Puzzle) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Puzzle_difficulty,
+		func(ctx context.Context) (any, error) {
+			return obj.Difficulty, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Puzzle_difficulty(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Puzzle",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -2388,6 +3069,76 @@ func (ec *executionContext) fieldContext_PuzzleStats_averageMistakes(_ context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _PuzzleWithStatus_puzzle(ctx context.Context, field graphql.CollectedField, obj *model.PuzzleWithStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PuzzleWithStatus_puzzle,
+		func(ctx context.Context) (any, error) {
+			return obj.Puzzle, nil
+		},
+		nil,
+		ec.marshalNPuzzle2ᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐPuzzle,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PuzzleWithStatus_puzzle(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PuzzleWithStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Puzzle_id(ctx, field)
+			case "grid":
+				return ec.fieldContext_Puzzle_grid(ctx, field)
+			case "prefilledPositions":
+				return ec.fieldContext_Puzzle_prefilledPositions(ctx, field)
+			case "difficulty":
+				return ec.fieldContext_Puzzle_difficulty(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Puzzle_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Puzzle", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PuzzleWithStatus_status(ctx context.Context, field graphql.CollectedField, obj *model.PuzzleWithStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PuzzleWithStatus_status,
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		ec.marshalNPuzzleStatus2githubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐPuzzleStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PuzzleWithStatus_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PuzzleWithStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type PuzzleStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_game(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2445,6 +3196,53 @@ func (ec *executionContext) fieldContext_Query_game(ctx context.Context, field g
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_getAvailablePuzzles(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_getAvailablePuzzles,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().GetAvailablePuzzles(ctx, fc.Args["guestId"].(string), fc.Args["limit"].(*int))
+		},
+		nil,
+		ec.marshalNPuzzleWithStatus2ᚕᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐPuzzleWithStatusᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_getAvailablePuzzles(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "puzzle":
+				return ec.fieldContext_PuzzleWithStatus_puzzle(ctx, field)
+			case "status":
+				return ec.fieldContext_PuzzleWithStatus_status(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PuzzleWithStatus", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_getAvailablePuzzles_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_puzzles(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2473,8 +3271,10 @@ func (ec *executionContext) fieldContext_Query_puzzles(_ context.Context, field 
 				return ec.fieldContext_Puzzle_id(ctx, field)
 			case "grid":
 				return ec.fieldContext_Puzzle_grid(ctx, field)
-			case "solution":
-				return ec.fieldContext_Puzzle_solution(ctx, field)
+			case "prefilledPositions":
+				return ec.fieldContext_Puzzle_prefilledPositions(ctx, field)
+			case "difficulty":
+				return ec.fieldContext_Puzzle_difficulty(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Puzzle_createdAt(ctx, field)
 			}
@@ -2740,6 +3540,90 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 				return ec.fieldContext___Schema_directives(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type __Schema", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SubmitAnswerResult_game(ctx context.Context, field graphql.CollectedField, obj *model.SubmitAnswerResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_SubmitAnswerResult_game,
+		func(ctx context.Context) (any, error) {
+			return obj.Game, nil
+		},
+		nil,
+		ec.marshalNGameResult2ᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐGameResult,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_SubmitAnswerResult_game(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SubmitAnswerResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_GameResult_id(ctx, field)
+			case "guestId":
+				return ec.fieldContext_GameResult_guestId(ctx, field)
+			case "puzzleId":
+				return ec.fieldContext_GameResult_puzzleId(ctx, field)
+			case "gridCurrent":
+				return ec.fieldContext_GameResult_gridCurrent(ctx, field)
+			case "totalMistakes":
+				return ec.fieldContext_GameResult_totalMistakes(ctx, field)
+			case "status":
+				return ec.fieldContext_GameResult_status(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_GameResult_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_GameResult_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GameResult", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SubmitAnswerResult_results(ctx context.Context, field graphql.CollectedField, obj *model.SubmitAnswerResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_SubmitAnswerResult_results,
+		func(ctx context.Context) (any, error) {
+			return obj.Results, nil
+		},
+		nil,
+		ec.marshalNCellVerifyResult2ᚕᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐCellVerifyResultᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_SubmitAnswerResult_results(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SubmitAnswerResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "row":
+				return ec.fieldContext_CellVerifyResult_row(ctx, field)
+			case "col":
+				return ec.fieldContext_CellVerifyResult_col(ctx, field)
+			case "feedback":
+				return ec.fieldContext_CellVerifyResult_feedback(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CellVerifyResult", field.Name)
 		},
 	}
 	return fc, nil
@@ -4595,6 +5479,80 @@ func (ec *executionContext) _Game(ctx context.Context, sel ast.SelectionSet, obj
 	return out
 }
 
+var gameResultImplementors = []string{"GameResult"}
+
+func (ec *executionContext) _GameResult(ctx context.Context, sel ast.SelectionSet, obj *model.GameResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, gameResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("GameResult")
+		case "id":
+			out.Values[i] = ec._GameResult_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "guestId":
+			out.Values[i] = ec._GameResult_guestId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "puzzleId":
+			out.Values[i] = ec._GameResult_puzzleId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "gridCurrent":
+			out.Values[i] = ec._GameResult_gridCurrent(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalMistakes":
+			out.Values[i] = ec._GameResult_totalMistakes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._GameResult_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._GameResult_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._GameResult_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var leaderboardEntryImplementors = []string{"LeaderboardEntry"}
 
 func (ec *executionContext) _LeaderboardEntry(ctx context.Context, sel ast.SelectionSet, obj *model.LeaderboardEntry) graphql.Marshaler {
@@ -4760,9 +5718,23 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "submitAnswer":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_submitAnswer(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "completeGame":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_completeGame(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "unlockPuzzlesAfterAd":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_unlockPuzzlesAfterAd(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -4839,6 +5811,50 @@ func (ec *executionContext) _PlayerStats(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var positionImplementors = []string{"Position"}
+
+func (ec *executionContext) _Position(ctx context.Context, sel ast.SelectionSet, obj *model.Position) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, positionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Position")
+		case "row":
+			out.Values[i] = ec._Position_row(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "col":
+			out.Values[i] = ec._Position_col(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var puzzleImplementors = []string{"Puzzle"}
 
 func (ec *executionContext) _Puzzle(ctx context.Context, sel ast.SelectionSet, obj *model.Puzzle) graphql.Marshaler {
@@ -4860,11 +5876,13 @@ func (ec *executionContext) _Puzzle(ctx context.Context, sel ast.SelectionSet, o
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "solution":
-			out.Values[i] = ec._Puzzle_solution(ctx, field, obj)
+		case "prefilledPositions":
+			out.Values[i] = ec._Puzzle_prefilledPositions(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "difficulty":
+			out.Values[i] = ec._Puzzle_difficulty(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._Puzzle_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -4947,6 +5965,50 @@ func (ec *executionContext) _PuzzleStats(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var puzzleWithStatusImplementors = []string{"PuzzleWithStatus"}
+
+func (ec *executionContext) _PuzzleWithStatus(ctx context.Context, sel ast.SelectionSet, obj *model.PuzzleWithStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, puzzleWithStatusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PuzzleWithStatus")
+		case "puzzle":
+			out.Values[i] = ec._PuzzleWithStatus_puzzle(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._PuzzleWithStatus_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -4976,6 +6038,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_game(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "getAvailablePuzzles":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_getAvailablePuzzles(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
@@ -5081,6 +6165,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___schema(ctx, field)
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var submitAnswerResultImplementors = []string{"SubmitAnswerResult"}
+
+func (ec *executionContext) _SubmitAnswerResult(ctx context.Context, sel ast.SelectionSet, obj *model.SubmitAnswerResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, submitAnswerResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SubmitAnswerResult")
+		case "game":
+			out.Values[i] = ec._SubmitAnswerResult_game(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "results":
+			out.Values[i] = ec._SubmitAnswerResult_results(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -5742,6 +6870,16 @@ func (ec *executionContext) marshalNGame2ᚖgithubᚗcomᚋkensheroᚋ100sumgame
 	return ec._Game(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNGameResult2ᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐGameResult(ctx context.Context, sel ast.SelectionSet, v *model.GameResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._GameResult(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNGameStatus2githubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐGameStatus(ctx context.Context, v any) (model.GameStatus, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := model.GameStatus(tmp)
@@ -5933,6 +7071,60 @@ func (ec *executionContext) marshalNPlayerStats2ᚖgithubᚗcomᚋkensheroᚋ100
 	return ec._PlayerStats(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNPosition2ᚕᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐPositionᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Position) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPosition2ᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐPosition(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNPosition2ᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐPosition(ctx context.Context, sel ast.SelectionSet, v *model.Position) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Position(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNPuzzle2ᚕᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐPuzzleᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Puzzle) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -6001,6 +7193,70 @@ func (ec *executionContext) marshalNPuzzleStats2ᚖgithubᚗcomᚋkensheroᚋ100
 	return ec._PuzzleStats(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNPuzzleStatus2githubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐPuzzleStatus(ctx context.Context, v any) (model.PuzzleStatus, error) {
+	var res model.PuzzleStatus
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNPuzzleStatus2githubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐPuzzleStatus(ctx context.Context, sel ast.SelectionSet, v model.PuzzleStatus) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) marshalNPuzzleWithStatus2ᚕᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐPuzzleWithStatusᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.PuzzleWithStatus) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPuzzleWithStatus2ᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐPuzzleWithStatus(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNPuzzleWithStatus2ᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐPuzzleWithStatus(ctx context.Context, sel ast.SelectionSet, v *model.PuzzleWithStatus) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PuzzleWithStatus(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -6015,6 +7271,20 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNSubmitAnswerResult2githubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐSubmitAnswerResult(ctx context.Context, sel ast.SelectionSet, v model.SubmitAnswerResult) graphql.Marshaler {
+	return ec._SubmitAnswerResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNSubmitAnswerResult2ᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐSubmitAnswerResult(ctx context.Context, sel ast.SelectionSet, v *model.SubmitAnswerResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._SubmitAnswerResult(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNVerifyResult2githubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐVerifyResult(ctx context.Context, sel ast.SelectionSet, v model.VerifyResult) graphql.Marshaler {

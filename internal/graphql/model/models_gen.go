@@ -2,6 +2,25 @@
 
 package model
 
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"strconv"
+)
+
+// Game result for public API (excludes GridSolution)
+type GameResult struct {
+	ID            string     `json:"id"`
+	GuestID       string     `json:"guestId"`
+	PuzzleID      string     `json:"puzzleId"`
+	GridCurrent   [][]*Cell  `json:"gridCurrent"`
+	TotalMistakes int        `json:"totalMistakes"`
+	Status        GameStatus `json:"status"`
+	CreatedAt     string     `json:"createdAt"`
+	UpdatedAt     string     `json:"updatedAt"`
+}
+
 // Result of making a single move
 type MoveResult struct {
 	Game          *Game        `json:"game"`
@@ -21,12 +40,19 @@ type PlayerStats struct {
 	TotalPuzzles     int    `json:"totalPuzzles"`
 }
 
+// Position in grid
+type Position struct {
+	Row int `json:"row"`
+	Col int `json:"col"`
+}
+
 // Puzzle from puzzle pool
 type Puzzle struct {
-	ID        string  `json:"id"`
-	Grid      [][]int `json:"grid"`
-	Solution  [][]int `json:"solution"`
-	CreatedAt string  `json:"createdAt"`
+	ID                 string      `json:"id"`
+	Grid               [][]int     `json:"grid"`
+	PrefilledPositions []*Position `json:"prefilledPositions"`
+	Difficulty         *string     `json:"difficulty,omitempty"`
+	CreatedAt          string      `json:"createdAt"`
 }
 
 // Statistics for a specific puzzle
@@ -37,5 +63,79 @@ type PuzzleStats struct {
 	AverageMistakes float64 `json:"averageMistakes"`
 }
 
+// Puzzle with status for a guest
+type PuzzleWithStatus struct {
+	Puzzle *Puzzle      `json:"puzzle"`
+	Status PuzzleStatus `json:"status"`
+}
+
 type Query struct {
+}
+
+// Result of submitting multiple answers
+type SubmitAnswerResult struct {
+	Game    *GameResult         `json:"game"`
+	Results []*CellVerifyResult `json:"results"`
+}
+
+// Puzzle status enum
+type PuzzleStatus string
+
+const (
+	PuzzleStatusAvailable PuzzleStatus = "AVAILABLE"
+	PuzzleStatusPlaying   PuzzleStatus = "PLAYING"
+	PuzzleStatusCompleted PuzzleStatus = "COMPLETED"
+	PuzzleStatusArchived  PuzzleStatus = "ARCHIVED"
+	PuzzleStatusAdBlock   PuzzleStatus = "AD_BLOCK"
+)
+
+var AllPuzzleStatus = []PuzzleStatus{
+	PuzzleStatusAvailable,
+	PuzzleStatusPlaying,
+	PuzzleStatusCompleted,
+	PuzzleStatusArchived,
+	PuzzleStatusAdBlock,
+}
+
+func (e PuzzleStatus) IsValid() bool {
+	switch e {
+	case PuzzleStatusAvailable, PuzzleStatusPlaying, PuzzleStatusCompleted, PuzzleStatusArchived, PuzzleStatusAdBlock:
+		return true
+	}
+	return false
+}
+
+func (e PuzzleStatus) String() string {
+	return string(e)
+}
+
+func (e *PuzzleStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = PuzzleStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid PuzzleStatus", str)
+	}
+	return nil
+}
+
+func (e PuzzleStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *PuzzleStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e PuzzleStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }
