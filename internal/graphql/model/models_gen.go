@@ -21,6 +21,19 @@ type GameResult struct {
 	UpdatedAt     string     `json:"updatedAt"`
 }
 
+// Guest set progress
+type GuestSetProgress struct {
+	GuestID          string  `json:"guestId"`
+	SetID            string  `json:"setId"`
+	PuzzlesCompleted int     `json:"puzzlesCompleted"`
+	IsUnlocked       bool    `json:"isUnlocked"`
+	IsCompleted      bool    `json:"isCompleted"`
+	UnlockedAt       *string `json:"unlockedAt,omitempty"`
+	CompletedAt      *string `json:"completedAt,omitempty"`
+	CurrentStamina   int     `json:"currentStamina"`
+	CurrentScore     int     `json:"currentScore"`
+}
+
 // Result of making a single move
 type MoveResult struct {
 	Game          *Game        `json:"game"`
@@ -55,6 +68,14 @@ type Puzzle struct {
 	CreatedAt          string      `json:"createdAt"`
 }
 
+// Puzzle set/group
+type PuzzleSet struct {
+	ID         string `json:"id"`
+	SetOrder   int    `json:"setOrder"`
+	Difficulty string `json:"difficulty"`
+	CreatedAt  string `json:"createdAt"`
+}
+
 // Statistics for a specific puzzle
 type PuzzleStats struct {
 	PuzzleID        string  `json:"puzzleId"`
@@ -65,8 +86,10 @@ type PuzzleStats struct {
 
 // Puzzle with status for a guest
 type PuzzleWithStatus struct {
-	Puzzle *Puzzle      `json:"puzzle"`
-	Status PuzzleStatus `json:"status"`
+	Puzzle          *Puzzle      `json:"puzzle"`
+	Status          PuzzleStatus `json:"status"`
+	SolvedPositions []*Position  `json:"solvedPositions"`
+	SetOrder        int          `json:"setOrder"`
 }
 
 type Query struct {

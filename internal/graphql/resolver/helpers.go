@@ -1,11 +1,35 @@
 package resolver
 
 import (
+	"context"
 	"fmt"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/kenshero/100sumgame/internal/domain"
 	"github.com/kenshero/100sumgame/internal/graphql/model"
+	"github.com/kenshero/100sumgame/internal/middleware"
 )
+
+func resolveGuestUUID(ctx context.Context, guestID string) (uuid.UUID, error) {
+	if guestID != "" {
+		if parsedGuestID, err := uuid.Parse(guestID); err == nil {
+			return parsedGuestID, nil
+		}
+	}
+
+	session := middleware.GetSessionFromContext(ctx)
+	if session == nil {
+		return uuid.Nil, fmt.Errorf("session not found")
+	}
+
+	guestUUID, err := uuid.Parse(session.GuestID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	return guestUUID, nil
+}
 
 // Helper function to convert domain Game to GraphQL model
 func domainGameToModel(game *domain.Game) *model.Game {
@@ -42,6 +66,10 @@ func domainGameToModel(game *domain.Game) *model.Game {
 
 // Helper function to convert domain Puzzle to GraphQL model
 func domainPuzzleToModel(puzzle *domain.Puzzle) *model.Puzzle {
+	return domainPuzzleToModelWithSolved(puzzle, nil)
+}
+
+func domainPuzzleToModelWithSolved(puzzle *domain.Puzzle, solvedPositions []domain.Position) *model.Puzzle {
 	// Create Grid with only prefilled positions showing values (rest are 0)
 	size := len(puzzle.GridSolution)
 	grid := make([][]int, size)
@@ -56,19 +84,37 @@ func domainPuzzleToModel(puzzle *domain.Puzzle) *model.Puzzle {
 		prefilledMap[fmt.Sprintf("%d,%d", pos.Row, pos.Col)] = true
 	}
 
-	// Fill in only the prefilled positions with their solution values
+	// Create map of solved positions from guest progress
+	solvedMap := make(map[string]bool)
+	for _, pos := range solvedPositions {
+		solvedMap[fmt.Sprintf("%d,%d", pos.Row, pos.Col)] = true
+	}
+
+	// Fill in prefilled and solved positions with their solution values
 	for i := 0; i < size; i++ {
 		for j := 0; j < size; j++ {
-			if prefilledMap[fmt.Sprintf("%d,%d", i, j)] {
+			key := fmt.Sprintf("%d,%d", i, j)
+			if prefilledMap[key] || solvedMap[key] {
 				grid[i][j] = puzzle.GridSolution[i][j]
 			}
 		}
 	}
 
+	// Build prefilledPositions: include BOTH original prefilled AND solved positions
+	// so the frontend knows which cells are filled and read-only
+	allPositions := make([]*model.Position, 0, len(puzzle.PrefilledPositions)+len(solvedPositions))
+	for _, pos := range puzzle.PrefilledPositions {
+		allPositions = append(allPositions, &model.Position{Row: pos.Row, Col: pos.Col})
+	}
+	for _, pos := range solvedPositions {
+		allPositions = append(allPositions, &model.Position{Row: pos.Row, Col: pos.Col})
+	}
+
 	return &model.Puzzle{
-		ID:        puzzle.ID.String(),
-		Grid:      grid,
-		CreatedAt: puzzle.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:                 puzzle.ID.String(),
+		Grid:               grid,
+		PrefilledPositions: allPositions,
+		CreatedAt:          puzzle.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
 
@@ -99,11 +145,52 @@ func domainGridToModel(grid [][]domain.Cell) [][]*model.Cell {
 // Helper function to convert domain PuzzleWithStatus to GraphQL model PuzzleWithStatus
 func domainPuzzleWithStatusToModel(puzzleWithStatus *domain.PuzzleWithStatus) *model.PuzzleWithStatus {
 	puzzle := puzzleWithStatus.Puzzle
-	puzzleModel := domainPuzzleToModel(puzzle)
+	puzzleModel := domainPuzzleToModelWithSolved(puzzle, puzzleWithStatus.SolvedPositions)
 	status := model.PuzzleStatus(puzzleWithStatus.Status)
 
-	return &model.PuzzleWithStatus{
-		Puzzle: puzzleModel,
-		Status: status,
+	// Convert solved positions to model
+	solvedPositions := make([]*model.Position, len(puzzleWithStatus.SolvedPositions))
+	for i, pos := range puzzleWithStatus.SolvedPositions {
+		solvedPositions[i] = &model.Position{
+			Row: pos.Row,
+			Col: pos.Col,
+		}
 	}
+
+	// Get set order from puzzle set - we'll need to fetch this
+	// For now, return 0 as default
+	setOrder := 0
+
+	return &model.PuzzleWithStatus{
+		Puzzle:          puzzleModel,
+		Status:          status,
+		SolvedPositions: solvedPositions,
+		SetOrder:        setOrder,
+	}
+}
+
+// Helper function to convert domain GuestSetProgress to GraphQL model
+func domainGuestSetProgressToModel(progress *domain.GuestSetProgress) *model.GuestSetProgress {
+	unlockedAt := formatTimePtr(progress.UnlockedAt)
+	completedAt := formatTimePtr(progress.CompletedAt)
+
+	return &model.GuestSetProgress{
+		GuestID:          progress.GuestID.String(),
+		SetID:            progress.SetID.String(),
+		PuzzlesCompleted: progress.PuzzlesCompleted,
+		IsUnlocked:       progress.IsUnlocked,
+		IsCompleted:      progress.IsCompleted,
+		UnlockedAt:       &unlockedAt,
+		CompletedAt:      &completedAt,
+		CurrentStamina:   progress.CurrentStamina,
+		CurrentScore:     progress.CurrentScore,
+	}
+}
+
+// Helper function to format time.Time pointer to ISO string
+func formatTimePtr(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.Format("2006-01-02T15:04:05Z07:00")
 }

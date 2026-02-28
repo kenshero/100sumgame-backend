@@ -4,8 +4,14 @@ type Query {
   """Get a game by ID"""
   game(id: ID!): Game
 
+  """Get a game by guest ID and puzzle ID (returns current game session)"""
+  getGameByGuestAndPuzzle(guestId: ID!, puzzleId: ID!): GameResult!
+
   """Get available puzzles for a guest with their status"""
   getAvailablePuzzles(guestId: ID!, limit: Int = 20): [PuzzleWithStatus!]!
+
+  """Get current unlocked set for a guest"""
+  getCurrentSet(guestId: ID!): GuestSetProgress!
 
   """Get all puzzles from puzzle pool"""
   puzzles: [Puzzle!]!
@@ -30,7 +36,7 @@ type Mutation {
   """Make a move - fill a single cell and immediately verify it"""
   makeMove(gameId: ID!, row: Int!, col: Int!, value: Int!): MoveResult!
 
-  """Verify all cells in the game"""
+  """Verify all cells in game"""
   verifyGame(gameId: ID!): VerifyResult!
 
   """Submit multiple answers for a puzzle"""
@@ -39,8 +45,11 @@ type Mutation {
   """Complete the game and submit to leaderboard"""
   completeGame(gameId: ID!, guestId: ID!, username: String!): CompleteGameResult!
 
-  """Unlock new puzzles after watching ad - Archives completed puzzles and unlocks AD_BLOCK puzzles"""
-  unlockPuzzlesAfterAd(guestId: ID!): Boolean!
+  """Unlock next puzzle set after watching ad"""
+  unlockPuzzlesAfterAd(guestId: ID!): GuestSetProgress!
+
+  """Refresh game configuration from database (admin only)"""
+  refreshGameConfig: GameSettings!
 }
 
 """Game represents a game session"""
@@ -158,6 +167,39 @@ type Puzzle {
 type PuzzleWithStatus {
   puzzle: Puzzle!
   status: PuzzleStatus!
+  solvedPositions: [Position!]!
+  setOrder: Int!
+}
+
+"""Puzzle set/group"""
+type PuzzleSet {
+  id: ID!
+  setOrder: Int!
+  difficulty: String!
+  createdAt: String!
+}
+
+"""Guest set progress"""
+type GuestSetProgress {
+  guestId: ID!
+  setId: ID!
+  puzzlesCompleted: Int!
+  isUnlocked: Boolean!
+  isCompleted: Boolean!
+  unlockedAt: String
+  completedAt: String
+  currentStamina: Int!
+  currentScore: Int!
+}
+
+"""Game configuration values"""
+type GameSettings {
+  staminaMax: Int!
+  staminaRegenIntervalMinutes: Int!
+  staminaRegenAmount: Int!
+  initialScore: Int!
+  scoreDeductionPerMistake: Int!
+  scoreMinimum: Int!
 }
 
 """Puzzle status enum"""

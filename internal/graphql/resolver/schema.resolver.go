@@ -13,19 +13,11 @@ import (
 	"github.com/kenshero/100sumgame/internal/domain"
 	"github.com/kenshero/100sumgame/internal/graphql/generated"
 	"github.com/kenshero/100sumgame/internal/graphql/model"
-	"github.com/kenshero/100sumgame/internal/middleware"
 )
 
 // CreateGame mutation resolver
 func (r *mutationResolver) CreateGame(ctx context.Context, guestID string) (*model.Game, error) {
-	// Get session from context
-	session := middleware.GetSessionFromContext(ctx)
-	if session == nil {
-		return nil, fmt.Errorf("session not found")
-	}
-
-	// Parse guest ID from session
-	guestUUID, err := uuid.Parse(session.GuestID)
+	guestUUID, err := resolveGuestUUID(ctx, guestID)
 	if err != nil {
 		return nil, err
 	}
@@ -117,14 +109,7 @@ func (r *mutationResolver) VerifyGame(ctx context.Context, gameID string) (*mode
 
 // SubmitAnswer is the resolver for the submitAnswer field.
 func (r *mutationResolver) SubmitAnswer(ctx context.Context, guestID string, puzzleID string, answers []*model.CellInput) (*model.SubmitAnswerResult, error) {
-	// Get session from context
-	session := middleware.GetSessionFromContext(ctx)
-	if session == nil {
-		return nil, fmt.Errorf("session not found")
-	}
-
-	// Parse guest ID from session (ignore the guestID parameter from client)
-	guestUUID, err := uuid.Parse(session.GuestID)
+	guestUUID, err := resolveGuestUUID(ctx, guestID)
 	if err != nil {
 		return nil, err
 	}
@@ -182,14 +167,7 @@ func (r *mutationResolver) SubmitAnswer(ctx context.Context, guestID string, puz
 
 // CompleteGame mutation resolver
 func (r *mutationResolver) CompleteGame(ctx context.Context, gameID string, guestID string, username string) (*model.CompleteGameResult, error) {
-	// Get session from context
-	session := middleware.GetSessionFromContext(ctx)
-	if session == nil {
-		return nil, fmt.Errorf("session not found")
-	}
-
-	// Parse guest ID from session (ignore the guestID parameter from client)
-	guestUUID, err := uuid.Parse(session.GuestID)
+	guestUUID, err := resolveGuestUUID(ctx, guestID)
 	if err != nil {
 		return nil, err
 	}
@@ -222,30 +200,37 @@ func (r *mutationResolver) CompleteGame(ctx context.Context, gameID string, gues
 }
 
 // UnlockPuzzlesAfterAd is the resolver for the unlockPuzzlesAfterAd field.
-func (r *mutationResolver) UnlockPuzzlesAfterAd(ctx context.Context, guestID string) (bool, error) {
-	// Get session from context
-	session := middleware.GetSessionFromContext(ctx)
-	if session == nil {
-		return false, fmt.Errorf("session not found")
-	}
-
-	// Parse guest ID from session (ignore the guestID parameter from client)
-	guestUUID, err := uuid.Parse(session.GuestID)
+func (r *mutationResolver) UnlockPuzzlesAfterAd(ctx context.Context, guestID string) (*model.GuestSetProgress, error) {
+	guestUUID, err := resolveGuestUUID(ctx, guestID)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	// Mark all COMPLETED puzzles as ARCHIVED
-	if err := r.PuzzleService.PuzzleProgressRepo.MarkArchived(ctx, guestUUID); err != nil {
-		return false, fmt.Errorf("failed to archive completed puzzles: %w", err)
+	// Unlock next set for guest
+	progress, err := r.PuzzleService.UnlockNextSet(ctx, guestUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unlock next set: %w", err)
 	}
 
-	// Mark all AD_BLOCK puzzles as AVAILABLE
-	if err := r.PuzzleService.PuzzleProgressRepo.MarkAvailable(ctx, guestUUID); err != nil {
-		return false, fmt.Errorf("failed to unlock ad-block puzzles: %w", err)
+	return domainGuestSetProgressToModel(progress), nil
+}
+
+// RefreshGameConfig is the resolver for the refreshGameConfig field (admin only).
+func (r *mutationResolver) RefreshGameConfig(ctx context.Context) (*model.GameSettings, error) {
+	// Refresh config from database
+	settings, err := r.AdminService.RefreshConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to refresh config: %w", err)
 	}
 
-	return true, nil
+	return &model.GameSettings{
+		StaminaMax:                  settings.StaminaMax,
+		StaminaRegenIntervalMinutes: settings.StaminaRegenIntervalMinutes,
+		StaminaRegenAmount:          settings.StaminaRegenAmount,
+		InitialScore:                settings.InitialScore,
+		ScoreDeductionPerMistake:    settings.ScoreDeductionPerMistake,
+		ScoreMinimum:                settings.ScoreMinimum,
+	}, nil
 }
 
 // Game query resolver
@@ -263,16 +248,14 @@ func (r *queryResolver) Game(ctx context.Context, id string) (*model.Game, error
 	return domainGameToModel(game), nil
 }
 
+// GetGameByGuestAndPuzzle is the resolver for the getGameByGuestAndPuzzle field.
+func (r *queryResolver) GetGameByGuestAndPuzzle(ctx context.Context, guestID string, puzzleID string) (*model.GameResult, error) {
+	panic(fmt.Errorf("not implemented: GetGameByGuestAndPuzzle - getGameByGuestAndPuzzle"))
+}
+
 // GetAvailablePuzzles is the resolver for the getAvailablePuzzles field.
 func (r *queryResolver) GetAvailablePuzzles(ctx context.Context, guestID string, limit *int) ([]*model.PuzzleWithStatus, error) {
-	// Get session from context
-	session := middleware.GetSessionFromContext(ctx)
-	if session == nil {
-		return nil, fmt.Errorf("session not found")
-	}
-
-	// Parse guest ID from session (ignore the guestID parameter from client)
-	guestUUID, err := uuid.Parse(session.GuestID)
+	guestUUID, err := resolveGuestUUID(ctx, guestID)
 	if err != nil {
 		return nil, err
 	}
@@ -284,18 +267,39 @@ func (r *queryResolver) GetAvailablePuzzles(ctx context.Context, guestID string,
 	}
 
 	// Get available puzzles for this guest with their status
+	// Note: PuzzleService.GetAvailableForGuest already populates SolvedPositions
+	// for COMPLETED and PLAYING puzzles, so we don't need to fetch game state separately
 	puzzles, err := r.PuzzleService.GetAvailableForGuest(ctx, guestUUID, l)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert to model
+	// Convert to model - solved positions are already included in the puzzle data
 	result := make([]*model.PuzzleWithStatus, len(puzzles))
 	for i, puzzle := range puzzles {
+		if puzzle == nil || puzzle.Puzzle == nil {
+			continue
+		}
 		result[i] = domainPuzzleWithStatusToModel(puzzle)
 	}
 
 	return result, nil
+}
+
+// GetCurrentSet is the resolver for the getCurrentSet field.
+func (r *queryResolver) GetCurrentSet(ctx context.Context, guestID string) (*model.GuestSetProgress, error) {
+	guestUUID, err := resolveGuestUUID(ctx, guestID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get current unlocked set for guest
+	progress, err := r.PuzzleService.GetCurrentSet(ctx, guestUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	return domainGuestSetProgressToModel(progress), nil
 }
 
 // Puzzles query resolver - Get all puzzles from puzzle pool

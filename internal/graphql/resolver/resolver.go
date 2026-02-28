@@ -9,5 +9,6 @@ type Resolver struct {
 	GameService        *service.GameService
 	PuzzleService      *service.PuzzleService
 	LeaderboardService *service.LeaderboardService
+	AdminService       *service.AdminService
 	// AIService          *service.AIService  // TODO: Add back when implementing AI chat
 }

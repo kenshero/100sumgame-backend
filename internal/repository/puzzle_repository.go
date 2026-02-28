@@ -20,7 +20,7 @@ func NewPuzzleRepository(db *pgxpool.Pool) PuzzleRepository {
 
 func (r *puzzleRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Puzzle, error) {
 	query := `
-		SELECT id, grid_solution, prefilled_positions, difficulty, created_at
+		SELECT id, set_id, grid_solution, prefilled_positions, difficulty, created_at
 		FROM puzzle_pool
 		WHERE id = $1
 	`
@@ -30,6 +30,7 @@ func (r *puzzleRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.P
 
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&puzzle.ID,
+		&puzzle.SetID,
 		&gridJSON,
 		&positionsJSON,
 		&puzzle.Difficulty,
@@ -51,7 +52,7 @@ func (r *puzzleRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.P
 
 func (r *puzzleRepository) GetRandom(ctx context.Context) (*domain.Puzzle, error) {
 	query := `
-		SELECT id, grid_solution, prefilled_positions, difficulty, created_at
+		SELECT id, set_id, grid_solution, prefilled_positions, difficulty, created_at
 		FROM puzzle_pool
 		ORDER BY RANDOM()
 		LIMIT 1
@@ -62,6 +63,7 @@ func (r *puzzleRepository) GetRandom(ctx context.Context) (*domain.Puzzle, error
 
 	err := r.db.QueryRow(ctx, query).Scan(
 		&puzzle.ID,
+		&puzzle.SetID,
 		&gridJSON,
 		&positionsJSON,
 		&puzzle.Difficulty,
@@ -84,7 +86,7 @@ func (r *puzzleRepository) GetRandom(ctx context.Context) (*domain.Puzzle, error
 func (r *puzzleRepository) GetAvailablePuzzlesForGuest(ctx context.Context, guestID uuid.UUID) ([]*domain.Puzzle, error) {
 	// เลือก puzzles ที่ยังไม่เคยเล่นจบของ guest นี้
 	query := `
-		SELECT p.id, p.grid_solution, p.prefilled_positions, p.difficulty, p.created_at
+		SELECT p.id, p.set_id, p.grid_solution, p.prefilled_positions, p.difficulty, p.created_at
 		FROM puzzle_pool p
 		WHERE NOT EXISTS (
 			SELECT 1 FROM guest_puzzle_progress gpp
@@ -107,6 +109,7 @@ func (r *puzzleRepository) GetAvailablePuzzlesForGuest(ctx context.Context, gues
 
 		if err := rows.Scan(
 			&puzzle.ID,
+			&puzzle.SetID,
 			&gridJSON,
 			&positionsJSON,
 			&puzzle.Difficulty,
@@ -130,7 +133,7 @@ func (r *puzzleRepository) GetAvailablePuzzlesForGuest(ctx context.Context, gues
 
 func (r *puzzleRepository) GetAll(ctx context.Context) ([]*domain.Puzzle, error) {
 	query := `
-		SELECT id, grid_solution, prefilled_positions, difficulty, created_at
+		SELECT id, set_id, grid_solution, prefilled_positions, difficulty, created_at
 		FROM puzzle_pool
 		ORDER BY created_at DESC
 	`
@@ -148,6 +151,7 @@ func (r *puzzleRepository) GetAll(ctx context.Context) ([]*domain.Puzzle, error)
 
 		if err := rows.Scan(
 			&puzzle.ID,
+			&puzzle.SetID,
 			&gridJSON,
 			&positionsJSON,
 			&puzzle.Difficulty,
@@ -179,8 +183,8 @@ func (r *puzzleRepository) GetTotalCount(ctx context.Context) (int, error) {
 
 func (r *puzzleRepository) Create(ctx context.Context, puzzle *domain.Puzzle) error {
 	query := `
-		INSERT INTO puzzle_pool (id, grid_solution, prefilled_positions, difficulty, created_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO puzzle_pool (id, set_id, grid_solution, prefilled_positions, difficulty, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`
 
 	gridJSON, err := json.Marshal(puzzle.GridSolution)
@@ -195,6 +199,7 @@ func (r *puzzleRepository) Create(ctx context.Context, puzzle *domain.Puzzle) er
 
 	_, err = r.db.Exec(ctx, query,
 		puzzle.ID,
+		puzzle.SetID,
 		gridJSON,
 		positionsJSON,
 		puzzle.Difficulty,
@@ -202,4 +207,48 @@ func (r *puzzleRepository) Create(ctx context.Context, puzzle *domain.Puzzle) er
 	)
 
 	return err
+}
+
+// GetPuzzlesBySet retrieves all puzzles belonging to a specific set
+func (r *puzzleRepository) GetPuzzlesBySet(ctx context.Context, setID uuid.UUID) ([]*domain.Puzzle, error) {
+	query := `
+		SELECT id, set_id, grid_solution, prefilled_positions, difficulty, created_at
+		FROM puzzle_pool
+		WHERE set_id = $1
+		ORDER BY id
+	`
+
+	rows, err := r.db.Query(ctx, query, setID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var puzzles []*domain.Puzzle
+	for rows.Next() {
+		var puzzle domain.Puzzle
+		var gridJSON, positionsJSON []byte
+
+		if err := rows.Scan(
+			&puzzle.ID,
+			&puzzle.SetID,
+			&gridJSON,
+			&positionsJSON,
+			&puzzle.Difficulty,
+			&puzzle.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal(gridJSON, &puzzle.GridSolution); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(positionsJSON, &puzzle.PrefilledPositions); err != nil {
+			return nil, err
+		}
+
+		puzzles = append(puzzles, &puzzle)
+	}
+
+	return puzzles, nil
 }

@@ -4,6 +4,9 @@ import (
 	"os"
 )
 
+// AdminSecretToken is the hardcoded secret token for admin operations
+const AdminSecretToken = "9yoNTrMFJGR16VZ3EU75Mwji8QUSjvukKirrEpTqjpHEaMobLtJD40juYsAND7oJKfJJxSNZ6NqnIxI8v8s63r"
+
 // Config holds all configuration for the application
 type Config struct {
 	Port         string

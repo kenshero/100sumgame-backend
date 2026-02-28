@@ -17,14 +17,43 @@ func NewPuzzleProgressRepository(db *pgxpool.Pool) PuzzleProgressRepository {
 	return &puzzleProgressRepository{db: db}
 }
 
-func (r *puzzleProgressRepository) MarkCompleted(ctx context.Context, guestID, puzzleID uuid.UUID) error {
+func (r *puzzleProgressRepository) MarkCompleted(ctx context.Context, guestID, puzzleID uuid.UUID, solvedPositions []domain.Position) error {
 	query := `
-		INSERT INTO guest_puzzle_progress (guest_id, puzzle_id)
-		VALUES ($1, $2)
-		ON CONFLICT (guest_id, puzzle_id) DO NOTHING
+		INSERT INTO guest_puzzle_progress (guest_id, puzzle_id, status, completed_at, solved_positions)
+		VALUES ($1, $2, 'COMPLETED', NOW(), $3)
+		ON CONFLICT (guest_id, puzzle_id)
+		DO UPDATE SET status = 'COMPLETED', completed_at = NOW(), solved_positions = $3
+	`
+
+	_, err := r.db.Exec(ctx, query, guestID, puzzleID, solvedPositions)
+	return err
+}
+
+func (r *puzzleProgressRepository) MarkPlaying(ctx context.Context, guestID, puzzleID uuid.UUID) error {
+	query := `
+		INSERT INTO guest_puzzle_progress (guest_id, puzzle_id, status, completed_at)
+		VALUES ($1, $2, 'PLAYING', NOW())
+		ON CONFLICT (guest_id, puzzle_id)
+		DO UPDATE SET status = CASE
+			WHEN guest_puzzle_progress.status = 'COMPLETED' THEN 'COMPLETED'
+			ELSE 'PLAYING'
+		END
 	`
 
 	_, err := r.db.Exec(ctx, query, guestID, puzzleID)
+	return err
+}
+
+func (r *puzzleProgressRepository) UpdateSolvedPositions(ctx context.Context, guestID, puzzleID uuid.UUID, solvedPositions []domain.Position) error {
+	query := `
+		INSERT INTO guest_puzzle_progress (guest_id, puzzle_id, status, solved_positions)
+		VALUES ($1, $2, 'PLAYING', $3)
+		ON CONFLICT (guest_id, puzzle_id)
+		DO UPDATE SET solved_positions = $3
+		WHERE guest_puzzle_progress.status != 'COMPLETED'
+	`
+
+	_, err := r.db.Exec(ctx, query, guestID, puzzleID, solvedPositions)
 	return err
 }
 
@@ -32,7 +61,7 @@ func (r *puzzleProgressRepository) GetCompletedPuzzles(ctx context.Context, gues
 	query := `
 		SELECT puzzle_id
 		FROM guest_puzzle_progress
-		WHERE guest_id = $1
+		WHERE guest_id = $1 AND status = 'COMPLETED'
 		ORDER BY completed_at DESC
 	`
 
@@ -58,7 +87,7 @@ func (r *puzzleProgressRepository) GetCompletedCount(ctx context.Context, guestI
 	query := `
 		SELECT COUNT(DISTINCT puzzle_id)
 		FROM guest_puzzle_progress
-		WHERE guest_id = $1
+		WHERE guest_id = $1 AND status = 'COMPLETED'
 	`
 
 	var count int
@@ -70,7 +99,7 @@ func (r *puzzleProgressRepository) HasCompleted(ctx context.Context, guestID, pu
 	query := `
 		SELECT EXISTS(
 			SELECT 1 FROM guest_puzzle_progress
-			WHERE guest_id = $1 AND puzzle_id = $2
+			WHERE guest_id = $1 AND puzzle_id = $2 AND status = 'COMPLETED'
 		)
 	`
 
@@ -83,22 +112,24 @@ func (r *puzzleProgressRepository) HasCompleted(ctx context.Context, guestID, pu
 func (r *puzzleProgressRepository) GetAvailablePuzzlesForGuest(ctx context.Context, guestID uuid.UUID, limit int) ([]*domain.PuzzleWithStatus, error) {
 	query := `
 		WITH all_puzzles AS (
-			SELECT id, grid_solution, prefilled_positions, created_at
+			SELECT id, set_id, grid_solution, prefilled_positions, created_at
 			FROM puzzle_pool
 			ORDER BY id ASC
 			LIMIT $1
 		),
 		guest_progress AS (
-			SELECT puzzle_id, status
+			SELECT puzzle_id, status, solved_positions
 			FROM guest_puzzle_progress
 			WHERE guest_id = $2
 		)
 		SELECT 
 			ap.id,
+			ap.set_id,
 			ap.grid_solution,
 			ap.prefilled_positions,
 			ap.created_at,
-			COALESCE(gp.status, 'AVAILABLE') as status
+			COALESCE(gp.status, 'AVAILABLE') as status,
+			gp.solved_positions
 		FROM all_puzzles ap
 		LEFT JOIN guest_progress gp ON ap.id = gp.puzzle_id
 	`
@@ -114,13 +145,16 @@ func (r *puzzleProgressRepository) GetAvailablePuzzlesForGuest(ctx context.Conte
 		var p domain.PuzzleWithStatus
 		var puzzle domain.Puzzle
 		var status string
+		var solvedPositions []domain.Position
 
 		err := rows.Scan(
 			&puzzle.ID,
+			&puzzle.SetID,
 			&puzzle.GridSolution,
 			&puzzle.PrefilledPositions,
 			&puzzle.CreatedAt,
 			&status,
+			&solvedPositions,
 		)
 		if err != nil {
 			return nil, err
@@ -128,6 +162,7 @@ func (r *puzzleProgressRepository) GetAvailablePuzzlesForGuest(ctx context.Conte
 
 		p.Puzzle = &puzzle
 		p.Status = domain.PuzzleStatus(status)
+		p.SolvedPositions = solvedPositions
 		puzzles = append(puzzles, &p)
 	}
 

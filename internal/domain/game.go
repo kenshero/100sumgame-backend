@@ -46,8 +46,9 @@ const (
 
 // PuzzleWithStatus represents a puzzle with its status for a guest
 type PuzzleWithStatus struct {
-	Puzzle *Puzzle
-	Status PuzzleStatus
+	Puzzle          *Puzzle
+	Status          PuzzleStatus
+	SolvedPositions []Position
 }
 
 // Game represents a game session

@@ -36,7 +36,7 @@ services:
       # Exclude go modules cache from mount
       - go_modules:/go/pkg/mod
     env_file:
-      - ./backend/devops/.env.dev
+      - ./devops/.env.dev
     depends_on:
       db:
         condition: service_healthy

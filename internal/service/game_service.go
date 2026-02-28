@@ -11,27 +11,31 @@ import (
 
 // GameService handles game-related business logic
 type GameService struct {
-	repo                repository.GameRepository
-	puzzleService       *PuzzleService
-	puzzleProgressRepo  repository.PuzzleProgressRepository
-	createGameLimiter   *OperationRateLimiter
-	fillCellsLimiter    *OperationRateLimiter
-	makeMoveLimiter     *OperationRateLimiter
-	verifyGameLimiter   *OperationRateLimiter
-	submitAnswerLimiter *OperationRateLimiter
+	repo                 repository.GameRepository
+	puzzleService        *PuzzleService
+	puzzleProgressRepo   repository.PuzzleProgressRepository
+	guestSetProgressRepo repository.GuestSetProgressRepository
+	configService        *ConfigService
+	createGameLimiter    *OperationRateLimiter
+	fillCellsLimiter     *OperationRateLimiter
+	makeMoveLimiter      *OperationRateLimiter
+	verifyGameLimiter    *OperationRateLimiter
+	submitAnswerLimiter  *OperationRateLimiter
 }
 
 // NewGameService creates a new game service
-func NewGameService(repo repository.GameRepository, puzzleService *PuzzleService, puzzleProgressRepo repository.PuzzleProgressRepository) *GameService {
+func NewGameService(repo repository.GameRepository, puzzleService *PuzzleService, puzzleProgressRepo repository.PuzzleProgressRepository, guestSetProgressRepo repository.GuestSetProgressRepository, configService *ConfigService) *GameService {
 	return &GameService{
-		repo:                repo,
-		puzzleService:       puzzleService,
-		puzzleProgressRepo:  puzzleProgressRepo,
-		createGameLimiter:   NewOperationRateLimiter(10, 1*time.Minute), // 10 games per minute per guest/IP
-		fillCellsLimiter:    NewOperationRateLimiter(30, 1*time.Minute), // 30 fill operations per minute per guest/IP
-		makeMoveLimiter:     NewOperationRateLimiter(30, 1*time.Minute), // 30 moves per minute per guest/IP
-		verifyGameLimiter:   NewOperationRateLimiter(10, 1*time.Minute), // 10 verifications per minute per guest/IP
-		submitAnswerLimiter: NewOperationRateLimiter(30, 1*time.Minute), // 30 submissions per minute per guest/IP
+		repo:                 repo,
+		puzzleService:        puzzleService,
+		puzzleProgressRepo:   puzzleProgressRepo,
+		guestSetProgressRepo: guestSetProgressRepo,
+		configService:        configService,
+		createGameLimiter:    NewOperationRateLimiter(10, 1*time.Minute), // 10 games per minute per guest/IP
+		fillCellsLimiter:     NewOperationRateLimiter(30, 1*time.Minute), // 30 fill operations per minute per guest/IP
+		makeMoveLimiter:      NewOperationRateLimiter(30, 1*time.Minute), // 30 moves per minute per guest/IP
+		verifyGameLimiter:    NewOperationRateLimiter(10, 1*time.Minute), // 10 verifications per minute per guest/IP
+		submitAnswerLimiter:  NewOperationRateLimiter(30, 1*time.Minute), // 30 submissions per minute per guest/IP
 	}
 }
 
@@ -62,6 +66,15 @@ func (s *GameService) CreateGame(ctx context.Context, guestID uuid.UUID) (*domai
 // GetByID retrieves a game by ID
 func (s *GameService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Game, error) {
 	game, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, domain.ErrGameNotFound
+	}
+	return game, nil
+}
+
+// GetByGuestAndPuzzle retrieves the latest game session for a guest and puzzle
+func (s *GameService) GetByGuestAndPuzzle(ctx context.Context, guestID, puzzleID uuid.UUID) (*domain.Game, error) {
+	game, err := s.repo.GetByGuestAndPuzzle(ctx, guestID, puzzleID)
 	if err != nil {
 		return nil, domain.ErrGameNotFound
 	}
@@ -180,8 +193,9 @@ func (s *GameService) MakeMove(ctx context.Context, gameID uuid.UUID, row, col, 
 		game.Status = domain.StatusCompleted
 		isGameOver = true
 
-		// Mark puzzle as completed for this guest
-		if err := s.puzzleProgressRepo.MarkCompleted(ctx, game.GuestID, game.PuzzleID); err != nil {
+		// Extract solved positions and mark puzzle as completed for this guest
+		solvedPositions := extractSolvedPositions(game)
+		if err := s.puzzleProgressRepo.MarkCompleted(ctx, game.GuestID, game.PuzzleID, solvedPositions); err != nil {
 			// Log error but don't fail the move
 			// The game is still saved, but progress tracking might have failed
 		}
@@ -303,8 +317,9 @@ func (s *GameService) VerifyGame(ctx context.Context, gameID uuid.UUID) (*domain
 	if result.AllCorrect {
 		game.Status = domain.StatusCompleted
 
-		// Mark puzzle as completed for this guest
-		if err := s.puzzleProgressRepo.MarkCompleted(ctx, game.GuestID, game.PuzzleID); err != nil {
+		// Extract solved positions and mark puzzle as completed for this guest
+		solvedPositions := extractSolvedPositions(game)
+		if err := s.puzzleProgressRepo.MarkCompleted(ctx, game.GuestID, game.PuzzleID, solvedPositions); err != nil {
 			// Log error but don't fail the verification
 			// The game is still saved, but progress tracking might have failed
 			// This can be retried later if needed
@@ -356,17 +371,57 @@ func (s *GameService) SubmitAnswer(ctx context.Context, guestID, puzzleID uuid.U
 		return nil, domain.ErrRateLimitExceeded
 	}
 
+	// Get game settings for stamina and score configuration
+	settings := s.configService.GetSettings()
+
+	// Get puzzle to determine which set it belongs to
+	puzzle, err := s.puzzleService.GetByID(ctx, puzzleID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if puzzle has a set
+	if puzzle.SetID == nil {
+		return nil, domain.ErrNoMoreSetsAvailable
+	}
+
+	setID := *puzzle.SetID
+
+	// Get guest's set progress
+	setProgress, err := s.guestSetProgressRepo.GetByGuestAndSet(ctx, guestID, setID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Regenerate stamina based on time elapsed
+	newStamina, newStaminaTime, err := s.guestSetProgressRepo.RegenerateStamina(
+		ctx,
+		guestID,
+		setID,
+		setProgress.CurrentStamina,
+		settings.StaminaMax,
+		settings.StaminaRegenIntervalMinutes,
+		settings.StaminaRegenAmount,
+		setProgress.LastStaminaUpdate,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update set progress with regenerated stamina
+	setProgress.CurrentStamina = newStamina
+	setProgress.LastStaminaUpdate = newStaminaTime
+
+	// Check if player has enough stamina (at least 1)
+	if setProgress.CurrentStamina < 1 {
+		return nil, domain.ErrInsufficientStamina
+	}
+
 	// Try to find existing game session for this guest + puzzle
 	game, err := s.repo.GetByGuestAndPuzzle(ctx, guestID, puzzleID)
 
 	// If no game session exists, create a new one
 	if err != nil {
-		// Get puzzle data
-		puzzle, err := s.puzzleService.GetByID(ctx, puzzleID)
-		if err != nil {
-			return nil, err
-		}
-
 		// Create new game session
 		game = domain.NewGame(puzzle, guestID)
 		if err := s.repo.Create(ctx, game); err != nil {
@@ -379,10 +434,16 @@ func (s *GameService) SubmitAnswer(ctx context.Context, guestID, puzzleID uuid.U
 		return nil, domain.ErrGameAlreadyComplete
 	}
 
+	// Mark puzzle as playing for this guest (best-effort)
+	if err := s.puzzleProgressRepo.MarkPlaying(ctx, guestID, puzzleID); err != nil {
+		// Don't fail submission if progress tracking update fails
+	}
+
 	// Process each answer
 	result := &domain.SubmitAnswerResult{
 		Results: make([]domain.CellVerifyResult, 0),
 	}
+	mistakeCount := 0
 
 	for _, answer := range answers {
 		// Validate and fill cell
@@ -401,9 +462,11 @@ func (s *GameService) SubmitAnswer(ctx context.Context, guestID, puzzleID uuid.U
 			if currentValue < correctValue {
 				feedback = domain.FeedbackTooLow
 				game.TotalMistakes++
+				mistakeCount++
 			} else {
 				feedback = domain.FeedbackTooHigh
 				game.TotalMistakes++
+				mistakeCount++
 			}
 		}
 
@@ -418,16 +481,41 @@ func (s *GameService) SubmitAnswer(ctx context.Context, guestID, puzzleID uuid.U
 		})
 	}
 
+	// Deduct stamina (1 per submission)
+	if err := s.guestSetProgressRepo.DeductStamina(ctx, guestID, setID); err != nil {
+		return nil, err
+	}
+
+	// Deduct score based on mistakes (10 points per mistake)
+	if mistakeCount > 0 {
+		scoreDeduction := mistakeCount * settings.ScoreDeductionPerMistake
+		if err := s.guestSetProgressRepo.DeductScore(ctx, guestID, setID, scoreDeduction, settings.ScoreMinimum); err != nil {
+			// Log error but don't fail the submission
+		}
+	}
+
 	game.UpdatedAt = time.Now()
+
+	// Extract current solved positions (all correctly answered cells so far)
+	solvedPositions := extractSolvedPositions(game)
 
 	// Check if all cells are now correct and complete
 	if s.checkGameComplete(game) {
 		game.Status = domain.StatusCompleted
 
-		// Mark puzzle as completed for this guest
-		if err := s.puzzleProgressRepo.MarkCompleted(ctx, guestID, puzzleID); err != nil {
+		// Mark puzzle as completed for this guest with final solved positions
+		if err := s.puzzleProgressRepo.MarkCompleted(ctx, guestID, puzzleID, solvedPositions); err != nil {
 			// Log error but don't fail the submission
-			// The game is still saved, but progress tracking might have failed
+		}
+
+		// Update set progress for this guest
+		s.updateSetProgress(ctx, guestID, game.PuzzleID)
+	} else {
+		// Game still in progress — persist solved positions so they survive browser refresh
+		if len(solvedPositions) > 0 {
+			if err := s.puzzleProgressRepo.UpdateSolvedPositions(ctx, guestID, puzzleID, solvedPositions); err != nil {
+				// Log error but don't fail the submission
+			}
 		}
 	}
 
@@ -450,4 +538,53 @@ func (s *GameService) SubmitAnswer(ctx context.Context, guestID, puzzleID uuid.U
 
 	result.Game = gameResult
 	return result, nil
+}
+
+// updateSetProgress updates the guest's set progress when a puzzle is completed
+func (s *GameService) updateSetProgress(ctx context.Context, guestID, puzzleID uuid.UUID) {
+	// Get puzzle to find which set it belongs to
+	puzzle, err := s.puzzleService.GetByID(ctx, puzzleID)
+	if err != nil {
+		// Log error but don't fail
+		return
+	}
+
+	// SetID is a pointer, check if it's nil
+	if puzzle.SetID == nil {
+		return
+	}
+
+	setID := *puzzle.SetID
+
+	// Get all puzzles in this set
+	setPuzzles, err := s.puzzleService.GetPuzzlesBySet(ctx, setID)
+	if err != nil {
+		// Log error but don't fail
+		return
+	}
+
+	// Count how many puzzles in this set are completed by this guest
+	completedCount := 0
+	for _, p := range setPuzzles {
+		hasCompleted, err := s.puzzleProgressRepo.HasCompleted(ctx, guestID, p.ID)
+		if err != nil {
+			continue
+		}
+		if hasCompleted {
+			completedCount++
+		}
+	}
+
+	// Update set progress
+	if err := s.guestSetProgressRepo.UpdateProgress(ctx, guestID, setID, completedCount); err != nil {
+		// Log error but don't fail
+		return
+	}
+
+	// If all puzzles in set are completed (10 puzzles), mark the set as completed
+	if completedCount >= 10 {
+		if err := s.guestSetProgressRepo.MarkCompleted(ctx, guestID, setID); err != nil {
+			// Log error but don't fail
+		}
+	}
 }

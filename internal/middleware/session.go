@@ -138,8 +138,9 @@ func (sm *SessionManager) DeleteSession(sessionID string) {
 
 // createSignedCookie creates a signed cookie value
 func (sm *SessionManager) createSignedCookie(sessionID string, expiresAt time.Time) string {
-	// Create signature: HMAC-SHA256(sessionID + expiresAt)
-	data := sessionID + ":" + expiresAt.Format(time.RFC3339)
+	_ = expiresAt
+	// Create signature: HMAC-SHA256(sessionID)
+	data := sessionID
 	h := hmac.New(sha256.New, sm.secretKey)
 	h.Write([]byte(data))
 	signature := base64.URLEncoding.EncodeToString(h.Sum(nil))

@@ -116,6 +116,11 @@ migrate:
 	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/001_create_puzzle_pool.sql
 	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/002_create_game_sessions.sql
 	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/003_create_leaderboard.sql
+	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/004_add_guest_id.sql
+	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/006_add_guest_puzzle_progress.sql
+	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/007_add_puzzle_status.sql
+	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/008_add_solved_positions.sql
+	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/009_add_puzzle_sets.sql
 	@echo "$(GREEN)✅ Migrations completed!$(NC)"
 
 seed:
