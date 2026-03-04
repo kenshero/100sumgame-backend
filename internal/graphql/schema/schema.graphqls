@@ -50,6 +50,9 @@ type Mutation {
 
   """Refresh game configuration from database (admin only)"""
   refreshGameConfig: GameSettings!
+
+  """Force complete all puzzles in current unlocked set for a guest (admin only)"""
+  adminForceCompletePuzzles(guestId: ID!): GuestSetProgress!
 }
 
 """Game represents a game session"""
@@ -186,6 +189,7 @@ type GuestSetProgress {
   puzzlesCompleted: Int!
   isUnlocked: Boolean!
   isCompleted: Boolean!
+  isLastSet: Boolean!
   unlockedAt: String
   completedAt: String
   currentStamina: Int!

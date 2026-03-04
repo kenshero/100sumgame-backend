@@ -72,18 +72,20 @@ Query to get the current unlocked set for a guest:
 ```graphql
 query GetCurrentSet {
   getCurrentSet {
-    set {
-      id
-      name
-      setOrder
-      puzzlesCount
-    }
+    setId
     puzzlesCompleted
     isUnlocked
     isCompleted
+    isLastSet
+    currentStamina
+    currentScore
+    unlockedAt
+    completedAt
   }
 }
 ```
+
+**Note:** The `isLastSet` field indicates whether this is the last available set in the game. When `isLastSet` is `true`, the frontend should hide the "Unlock Next Set" button and show a completion message.
 
 ### Get Puzzles in Current Set
 

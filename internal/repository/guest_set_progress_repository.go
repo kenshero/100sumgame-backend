@@ -43,6 +43,29 @@ func (r *guestSetProgressRepository) Create(ctx context.Context, progress *domai
 	return err
 }
 
+// CreateIfNotExists inserts progress only if it doesn't exist, otherwise does nothing
+// Uses ON CONFLICT DO NOTHING to prevent duplicate key errors
+func (r *guestSetProgressRepository) CreateIfNotExists(ctx context.Context, progress *domain.GuestSetProgress) error {
+	query := `
+		INSERT INTO guest_set_progress (guest_id, set_id, puzzles_completed, is_unlocked, is_completed, unlocked_at, completed_at, current_stamina, last_stamina_update, current_score)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT (guest_id, set_id) DO NOTHING
+	`
+	_, err := r.db.Exec(ctx, query,
+		progress.GuestID,
+		progress.SetID,
+		progress.PuzzlesCompleted,
+		progress.IsUnlocked,
+		progress.IsCompleted,
+		progress.UnlockedAt,
+		progress.CompletedAt,
+		progress.CurrentStamina,
+		progress.LastStaminaUpdate,
+		progress.CurrentScore,
+	)
+	return err
+}
+
 func (r *guestSetProgressRepository) GetByGuestAndSet(ctx context.Context, guestID, setID uuid.UUID) (*domain.GuestSetProgress, error) {
 	query := `
 		SELECT guest_id, set_id, puzzles_completed, is_unlocked, is_completed, unlocked_at, completed_at, current_stamina, last_stamina_update, current_score
@@ -113,7 +136,7 @@ func (r *guestSetProgressRepository) GetUnlockedSet(ctx context.Context, guestID
 		FROM guest_set_progress gsp
 		INNER JOIN puzzle_sets ps ON gsp.set_id = ps.id
 		WHERE gsp.guest_id = $1 AND gsp.is_unlocked = true AND gsp.is_completed = false
-		ORDER BY ps.set_order
+		ORDER BY ps.set_order ASC
 		LIMIT 1
 	`
 	row := r.db.QueryRow(ctx, query, guestID)
@@ -151,7 +174,7 @@ func (r *guestSetProgressRepository) MarkUnlocked(ctx context.Context, guestID, 
 	now := time.Now()
 	query := `
 		UPDATE guest_set_progress
-		SET is_unlocked = true, unlocked_at = $3
+		SET is_unlocked = true, unlocked_at = $3, current_stamina = 35, current_score = 500, last_stamina_update = $3
 		WHERE guest_id = $1 AND set_id = $2
 	`
 	_, err := r.db.Exec(ctx, query, guestID, setID, now)

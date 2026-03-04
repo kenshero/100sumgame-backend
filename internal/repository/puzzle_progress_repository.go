@@ -109,11 +109,13 @@ func (r *puzzleProgressRepository) HasCompleted(ctx context.Context, guestID, pu
 }
 
 // GetAvailablePuzzlesForGuest gets puzzles with their status for a guest
-func (r *puzzleProgressRepository) GetAvailablePuzzlesForGuest(ctx context.Context, guestID uuid.UUID, limit int) ([]*domain.PuzzleWithStatus, error) {
+// If setID is provided, filters puzzles by set_id
+func (r *puzzleProgressRepository) GetAvailablePuzzlesForGuest(ctx context.Context, guestID uuid.UUID, limit int, setID *uuid.UUID) ([]*domain.PuzzleWithStatus, error) {
 	query := `
 		WITH all_puzzles AS (
 			SELECT id, set_id, grid_solution, prefilled_positions, created_at
 			FROM puzzle_pool
+			WHERE ($3::uuid IS NULL OR set_id = $3::uuid)
 			ORDER BY id ASC
 			LIMIT $1
 		),
@@ -134,7 +136,7 @@ func (r *puzzleProgressRepository) GetAvailablePuzzlesForGuest(ctx context.Conte
 		LEFT JOIN guest_progress gp ON ap.id = gp.puzzle_id
 	`
 
-	rows, err := r.db.Query(ctx, query, limit, guestID)
+	rows, err := r.db.Query(ctx, query, limit, guestID, setID)
 	if err != nil {
 		return nil, err
 	}

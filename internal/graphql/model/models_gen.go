@@ -21,6 +21,16 @@ type GameResult struct {
 	UpdatedAt     string     `json:"updatedAt"`
 }
 
+// Game configuration values
+type GameSettings struct {
+	StaminaMax                  int `json:"staminaMax"`
+	StaminaRegenIntervalMinutes int `json:"staminaRegenIntervalMinutes"`
+	StaminaRegenAmount          int `json:"staminaRegenAmount"`
+	InitialScore                int `json:"initialScore"`
+	ScoreDeductionPerMistake    int `json:"scoreDeductionPerMistake"`
+	ScoreMinimum                int `json:"scoreMinimum"`
+}
+
 // Guest set progress
 type GuestSetProgress struct {
 	GuestID          string  `json:"guestId"`
@@ -28,6 +38,7 @@ type GuestSetProgress struct {
 	PuzzlesCompleted int     `json:"puzzlesCompleted"`
 	IsUnlocked       bool    `json:"isUnlocked"`
 	IsCompleted      bool    `json:"isCompleted"`
+	IsLastSet        bool    `json:"isLastSet"`
 	UnlockedAt       *string `json:"unlockedAt,omitempty"`
 	CompletedAt      *string `json:"completedAt,omitempty"`
 	CurrentStamina   int     `json:"currentStamina"`

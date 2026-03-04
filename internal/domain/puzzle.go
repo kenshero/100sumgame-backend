@@ -31,6 +31,7 @@ type GuestSetProgress struct {
 	PuzzlesCompleted  int        `json:"puzzles_completed"`
 	IsUnlocked        bool       `json:"is_unlocked"`
 	IsCompleted       bool       `json:"is_completed"`
+	IsLastSet         bool       `json:"is_last_set"` // Indicates if this is the last available set
 	UnlockedAt        *time.Time `json:"unlocked_at,omitempty"`
 	CompletedAt       *time.Time `json:"completed_at,omitempty"`
 	CurrentStamina    int        `json:"current_stamina"`

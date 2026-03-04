@@ -3,13 +3,47 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kenshero/100sumgame/internal/config"
 	"github.com/kenshero/100sumgame/internal/domain"
 	"github.com/kenshero/100sumgame/internal/graphql/model"
 	"github.com/kenshero/100sumgame/internal/middleware"
 )
+
+// contextKey is a custom type for context keys
+type contextKey string
+
+// RequestContextKey is the key used to store HTTP request in context
+const RequestContextKey contextKey = "http_request"
+
+// checkAdminToken validates admin secret token from context
+func checkAdminToken(ctx context.Context) error {
+	// Get HTTP request from context
+	req, ok := ctx.Value(RequestContextKey).(*http.Request)
+	if !ok || req == nil {
+		return fmt.Errorf("unable to get request from context")
+	}
+
+	authHeader := req.Header.Get("Authorization")
+	if authHeader == "" {
+		return fmt.Errorf("missing authorization header")
+	}
+
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+	if token == authHeader {
+		return fmt.Errorf("invalid authorization header format. Expected: 'Bearer <token>'")
+	}
+
+	if token != config.AdminSecretToken {
+		return fmt.Errorf("invalid admin token")
+	}
+
+	return nil
+}
 
 func resolveGuestUUID(ctx context.Context, guestID string) (uuid.UUID, error) {
 	if guestID != "" {
@@ -180,6 +214,7 @@ func domainGuestSetProgressToModel(progress *domain.GuestSetProgress) *model.Gue
 		PuzzlesCompleted: progress.PuzzlesCompleted,
 		IsUnlocked:       progress.IsUnlocked,
 		IsCompleted:      progress.IsCompleted,
+		IsLastSet:        progress.IsLastSet,
 		UnlockedAt:       &unlockedAt,
 		CompletedAt:      &completedAt,
 		CurrentStamina:   progress.CurrentStamina,

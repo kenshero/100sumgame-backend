@@ -91,13 +91,38 @@ func (s *PuzzleService) GetPuzzlesBySet(ctx context.Context, setID uuid.UUID) ([
 
 // GetAvailableForGuest retrieves all available puzzles for a guest with their status
 // Returns puzzles ordered by ID (not random) with status for each puzzle
+// If current set is not unlocked, returns puzzles from the last completed set
 // Limit parameter controls maximum number of puzzles returned
 func (s *PuzzleService) GetAvailableForGuest(ctx context.Context, guestID uuid.UUID, limit int) ([]*domain.PuzzleWithStatus, error) {
 	if limit <= 0 {
 		limit = 20 // Default limit
 	}
 
-	puzzles, err := s.PuzzleProgressRepo.GetAvailablePuzzlesForGuest(ctx, guestID, limit)
+	// Get current unlocked set for guest
+	setProgress, err := s.GetCurrentSet(ctx, guestID)
+	if err != nil {
+		return nil, err
+	}
+
+	// If current set is not unlocked, find the last completed set
+	targetSetID := setProgress.SetID
+	if !setProgress.IsUnlocked {
+		// Get all progress for this guest to find the last completed set
+		allProgress, err := s.GuestSetProgressRepo.GetByGuest(ctx, guestID)
+		if err == nil && len(allProgress) > 0 {
+			// Find the last completed set (highest set_order among completed sets)
+			for i := len(allProgress) - 1; i >= 0; i-- {
+				if allProgress[i].IsCompleted {
+					targetSetID = allProgress[i].SetID
+					break
+				}
+			}
+		}
+		// If no completed set found, keep the original set (shouldn't happen normally)
+	}
+
+	// Get all puzzles for guest, filtered by target set
+	puzzles, err := s.PuzzleProgressRepo.GetAvailablePuzzlesForGuest(ctx, guestID, limit, &targetSetID)
 	if err != nil {
 		return nil, domain.ErrNoPuzzlesAvailable
 	}
@@ -106,7 +131,20 @@ func (s *PuzzleService) GetAvailableForGuest(ctx context.Context, guestID uuid.U
 		return []*domain.PuzzleWithStatus{}, nil
 	}
 
+	// Filter puzzles to only include those from target set (redundant but safe check)
+	filteredPuzzles := make([]*domain.PuzzleWithStatus, 0)
 	for _, puzzleWithStatus := range puzzles {
+		if puzzleWithStatus.Puzzle == nil {
+			continue
+		}
+		// Check if puzzle belongs to target set (database should have filtered this already)
+		if puzzleWithStatus.Puzzle.SetID != nil && *puzzleWithStatus.Puzzle.SetID == targetSetID {
+			filteredPuzzles = append(filteredPuzzles, puzzleWithStatus)
+		}
+	}
+
+	// Update playing status and solved positions for filtered puzzles
+	for _, puzzleWithStatus := range filteredPuzzles {
 		if puzzleWithStatus.Puzzle == nil {
 			continue
 		}
@@ -131,7 +169,7 @@ func (s *PuzzleService) GetAvailableForGuest(ctx context.Context, guestID uuid.U
 		// If gameSolved is empty, keep SolvedPositions from DB (guest_puzzle_progress.solved_positions)
 	}
 
-	return puzzles, nil
+	return filteredPuzzles, nil
 }
 
 func extractSolvedPositions(game *domain.Game) []domain.Position {
@@ -172,32 +210,143 @@ func (s *PuzzleService) Create(ctx context.Context, puzzle *domain.Puzzle) error
 	return s.repo.Create(ctx, puzzle)
 }
 
+// EnsureAllSetsProgress creates progress records for all sets in the system for a guest
+// This ensures that users can see all available sets and properly handle new sets added later
+func (s *PuzzleService) EnsureAllSetsProgress(ctx context.Context, guestID uuid.UUID) error {
+	// Get all sets in the system
+	allSets, err := s.PuzzleSetRepo.GetAll(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Get existing progress for this guest
+	userProgress, err := s.GuestSetProgressRepo.GetByGuest(ctx, guestID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+
+	// Build a map of set IDs that user already has progress for
+	userSetIDs := make(map[uuid.UUID]bool)
+	for _, progress := range userProgress {
+		userSetIDs[progress.SetID] = true
+	}
+
+	// Create progress for any missing sets
+	now := time.Now()
+	isNewUser := len(userProgress) == 0
+
+	for _, set := range allSets {
+		if !userSetIDs[set.ID] {
+			// Determine if this should be the first unlocked set
+			// For new users, unlock the first set
+			// For existing users, all new sets start locked
+			isFirstSet := (isNewUser && set.SetOrder == 1)
+
+			newProgress := &domain.GuestSetProgress{
+				GuestID:           guestID,
+				SetID:             set.ID,
+				PuzzlesCompleted:  0,
+				IsUnlocked:        isFirstSet,
+				IsCompleted:       false,
+				UnlockedAt:        getUnlockedAt(isFirstSet, now),
+				CurrentStamina:    35,
+				LastStaminaUpdate: now,
+				CurrentScore:      500,
+			}
+
+			if err := s.GuestSetProgressRepo.CreateIfNotExists(ctx, newProgress); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// getUnlockedAt returns a pointer to time if unlocked, nil otherwise
+func getUnlockedAt(isUnlocked bool, now time.Time) *time.Time {
+	if isUnlocked {
+		return &now
+	}
+	return nil
+}
+
 // GetCurrentSet gets current unlocked set for a guest
 // If no unlocked set exists, it creates and unlocks first set automatically
 func (s *PuzzleService) GetCurrentSet(ctx context.Context, guestID uuid.UUID) (*domain.GuestSetProgress, error) {
+	// Ensure progress exists for all sets (syncs new sets automatically)
+	if err := s.EnsureAllSetsProgress(ctx, guestID); err != nil {
+		return nil, err
+	}
+
 	// Try to get unlocked set
 	setProgress, err := s.GuestSetProgressRepo.GetUnlockedSet(ctx, guestID)
 	if err == nil && setProgress != nil {
+		// Check if this is the last set
+		allSets, err := s.PuzzleSetRepo.GetAll(ctx)
+		if err == nil && len(allSets) > 0 {
+			currentSet, err := s.PuzzleSetRepo.GetByID(ctx, setProgress.SetID)
+			if err == nil {
+				setProgress.IsLastSet = (currentSet.SetOrder == len(allSets))
+			}
+		}
 		return setProgress, nil
 	}
 
-	// If no unlocked set, create and unlock first set
+	// If no unlocked set, check if player has completed sets
+	// This handles the case where player completed a set but hasn't unlocked the next one yet
+	allProgress, err := s.GuestSetProgressRepo.GetByGuest(ctx, guestID)
+	if err == nil && len(allProgress) > 0 {
+		// Find the last completed set (highest set_order among completed sets)
+		var lastCompletedSet *domain.GuestSetProgress
+		for i := len(allProgress) - 1; i >= 0; i-- {
+			if allProgress[i].IsCompleted {
+				lastCompletedSet = allProgress[i]
+				break
+			}
+		}
+
+		// If found a completed set, return it
+		if lastCompletedSet != nil {
+			allSets, err := s.PuzzleSetRepo.GetAll(ctx)
+			if err == nil && len(allSets) > 0 {
+				currentSet, err := s.PuzzleSetRepo.GetByID(ctx, lastCompletedSet.SetID)
+				if err == nil {
+					lastCompletedSet.IsLastSet = (currentSet.SetOrder == len(allSets))
+				}
+			}
+			return lastCompletedSet, nil
+		}
+	}
+
+	// If no progress at all, create and unlock first set
 	firstSet, err := s.PuzzleSetRepo.GetByOrder(ctx, 1)
 	if err != nil {
 		return nil, domain.ErrNoPuzzlesAvailable
 	}
 
-	now := time.Now()
-	newProgress := &domain.GuestSetProgress{
-		GuestID:          guestID,
-		SetID:            firstSet.ID,
-		PuzzlesCompleted: 0,
-		IsUnlocked:       true,
-		IsCompleted:      false,
-		UnlockedAt:       &now,
+	// Check if this is the last set (only 1 set)
+	isLastSet := false
+	allSets, err := s.PuzzleSetRepo.GetAll(ctx)
+	if err == nil {
+		isLastSet = (len(allSets) == 1)
 	}
 
-	if err := s.GuestSetProgressRepo.Create(ctx, newProgress); err != nil {
+	now := time.Now()
+	newProgress := &domain.GuestSetProgress{
+		GuestID:           guestID,
+		SetID:             firstSet.ID,
+		PuzzlesCompleted:  0,
+		IsUnlocked:        true,
+		IsCompleted:       false,
+		IsLastSet:         isLastSet,
+		UnlockedAt:        &now,
+		CurrentStamina:    35,
+		LastStaminaUpdate: now,
+		CurrentScore:      500,
+	}
+
+	if err := s.GuestSetProgressRepo.CreateIfNotExists(ctx, newProgress); err != nil {
 		return nil, err
 	}
 
@@ -206,6 +355,7 @@ func (s *PuzzleService) GetCurrentSet(ctx context.Context, guestID uuid.UUID) (*
 
 // GetAvailableForGuestWithSets retrieves available puzzles for a guest based on their current unlocked set
 // Returns puzzles from current unlocked set, ordered by set_order and puzzle id
+// If current set is not unlocked, returns puzzles from the last completed set
 func (s *PuzzleService) GetAvailableForGuestWithSets(ctx context.Context, guestID uuid.UUID, limit int) ([]*domain.PuzzleWithStatus, error) {
 	if limit <= 0 {
 		limit = 20
@@ -217,10 +367,25 @@ func (s *PuzzleService) GetAvailableForGuestWithSets(ctx context.Context, guestI
 		return nil, err
 	}
 
-	// Get puzzles from this set
-	// We need to modify puzzle progress repo to filter by set_id
-	// For now, let's use a different approach
-	puzzles, err := s.PuzzleProgressRepo.GetAvailablePuzzlesForGuest(ctx, guestID, limit)
+	// If current set is not unlocked, find the last completed set
+	targetSetID := setProgress.SetID
+	if !setProgress.IsUnlocked {
+		// Get all progress for this guest to find the last completed set
+		allProgress, err := s.GuestSetProgressRepo.GetByGuest(ctx, guestID)
+		if err == nil && len(allProgress) > 0 {
+			// Find the last completed set (highest set_order among completed sets)
+			for i := len(allProgress) - 1; i >= 0; i-- {
+				if allProgress[i].IsCompleted {
+					targetSetID = allProgress[i].SetID
+					break
+				}
+			}
+		}
+		// If no completed set found, keep the original set (shouldn't happen normally)
+	}
+
+	// Get puzzles from target set
+	puzzles, err := s.PuzzleProgressRepo.GetAvailablePuzzlesForGuest(ctx, guestID, limit, &targetSetID)
 	if err != nil {
 		return nil, domain.ErrNoPuzzlesAvailable
 	}
@@ -229,14 +394,13 @@ func (s *PuzzleService) GetAvailableForGuestWithSets(ctx context.Context, guestI
 		return []*domain.PuzzleWithStatus{}, nil
 	}
 
-	// Filter puzzles to only include those from current set
+	// Filter puzzles to only include those from target set
 	filteredPuzzles := make([]*domain.PuzzleWithStatus, 0)
 	for _, puzzleWithStatus := range puzzles {
 		if puzzleWithStatus.Puzzle == nil {
 			continue
 		}
-		// Check if puzzle belongs to current set
-		if puzzleWithStatus.Puzzle.SetID != nil && *puzzleWithStatus.Puzzle.SetID == setProgress.SetID {
+		if puzzleWithStatus.Puzzle.SetID != nil && *puzzleWithStatus.Puzzle.SetID == targetSetID {
 			filteredPuzzles = append(filteredPuzzles, puzzleWithStatus)
 		}
 	}
@@ -274,7 +438,34 @@ func (s *PuzzleService) UnlockNextSet(ctx context.Context, guestID uuid.UUID) (*
 	// Get current unlocked set to find its order
 	currentSetProgress, err := s.GuestSetProgressRepo.GetUnlockedSet(ctx, guestID)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			// No unlocked set found - user completed current set
+			// Get the last completed set (not just the last set)
+			allProgress, err := s.GuestSetProgressRepo.GetByGuest(ctx, guestID)
+			if err != nil {
+				return nil, err
+			}
+			if len(allProgress) == 0 {
+				return nil, domain.ErrNoPuzzlesAvailable
+			}
+
+			// Find the last completed set (highest set_order among completed sets)
+			var lastCompletedSet *domain.GuestSetProgress
+			for i := len(allProgress) - 1; i >= 0; i-- {
+				if allProgress[i].IsCompleted {
+					lastCompletedSet = allProgress[i]
+					break
+				}
+			}
+
+			if lastCompletedSet == nil {
+				return nil, domain.ErrNoPuzzlesAvailable
+			}
+
+			currentSetProgress = lastCompletedSet
+		} else {
+			return nil, err
+		}
 	}
 
 	// Get current set to find its order
@@ -289,18 +480,43 @@ func (s *PuzzleService) UnlockNextSet(ctx context.Context, guestID uuid.UUID) (*
 		return nil, domain.ErrNoMoreSetsAvailable
 	}
 
-	// Create progress for next set
-	now := time.Now()
-	newProgress := &domain.GuestSetProgress{
-		GuestID:          guestID,
-		SetID:            nextSet.ID,
-		PuzzlesCompleted: 0,
-		IsUnlocked:       true,
-		IsCompleted:      false,
-		UnlockedAt:       &now,
+	// Check if progress already exists for next set
+	existingProgress, err := s.GuestSetProgressRepo.GetByGuestAndSet(ctx, guestID, nextSet.ID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
 	}
 
-	if err := s.GuestSetProgressRepo.Create(ctx, newProgress); err != nil {
+	now := time.Now()
+
+	if existingProgress != nil {
+		// Progress exists - unlock it
+		if err := s.GuestSetProgressRepo.MarkUnlocked(ctx, guestID, nextSet.ID); err != nil {
+			return nil, err
+		}
+
+		// Get updated progress
+		existingProgress.IsUnlocked = true
+		existingProgress.UnlockedAt = &now
+		existingProgress.CurrentStamina = 35
+		existingProgress.CurrentScore = 500
+		existingProgress.LastStaminaUpdate = now
+		return existingProgress, nil
+	}
+
+	// Progress doesn't exist - create it
+	newProgress := &domain.GuestSetProgress{
+		GuestID:           guestID,
+		SetID:             nextSet.ID,
+		PuzzlesCompleted:  0,
+		IsUnlocked:        true,
+		IsCompleted:       false,
+		UnlockedAt:        &now,
+		CurrentStamina:    35,
+		LastStaminaUpdate: now,
+		CurrentScore:      500,
+	}
+
+	if err := s.GuestSetProgressRepo.CreateIfNotExists(ctx, newProgress); err != nil {
 		return nil, err
 	}
 

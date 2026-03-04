@@ -86,10 +86,22 @@ type ComplexityRoot struct {
 		UpdatedAt     func(childComplexity int) int
 	}
 
+	GameSettings struct {
+		InitialScore                func(childComplexity int) int
+		ScoreDeductionPerMistake    func(childComplexity int) int
+		ScoreMinimum                func(childComplexity int) int
+		StaminaMax                  func(childComplexity int) int
+		StaminaRegenAmount          func(childComplexity int) int
+		StaminaRegenIntervalMinutes func(childComplexity int) int
+	}
+
 	GuestSetProgress struct {
 		CompletedAt      func(childComplexity int) int
+		CurrentScore     func(childComplexity int) int
+		CurrentStamina   func(childComplexity int) int
 		GuestID          func(childComplexity int) int
 		IsCompleted      func(childComplexity int) int
+		IsLastSet        func(childComplexity int) int
 		IsUnlocked       func(childComplexity int) int
 		PuzzlesCompleted func(childComplexity int) int
 		SetID            func(childComplexity int) int
@@ -113,13 +125,15 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CompleteGame         func(childComplexity int, gameID string, guestID string, username string) int
-		CreateGame           func(childComplexity int, guestID string) int
-		FillCells            func(childComplexity int, gameID string, cells []*model.CellInput) int
-		MakeMove             func(childComplexity int, gameID string, row int, col int, value int) int
-		SubmitAnswer         func(childComplexity int, guestID string, puzzleID string, answers []*model.CellInput) int
-		UnlockPuzzlesAfterAd func(childComplexity int, guestID string) int
-		VerifyGame           func(childComplexity int, gameID string) int
+		AdminForceCompletePuzzles func(childComplexity int, guestID string) int
+		CompleteGame              func(childComplexity int, gameID string, guestID string, username string) int
+		CreateGame                func(childComplexity int, guestID string) int
+		FillCells                 func(childComplexity int, gameID string, cells []*model.CellInput) int
+		MakeMove                  func(childComplexity int, gameID string, row int, col int, value int) int
+		RefreshGameConfig         func(childComplexity int) int
+		SubmitAnswer              func(childComplexity int, guestID string, puzzleID string, answers []*model.CellInput) int
+		UnlockPuzzlesAfterAd      func(childComplexity int, guestID string) int
+		VerifyGame                func(childComplexity int, gameID string) int
 	}
 
 	PlayerStats struct {
@@ -194,6 +208,8 @@ type MutationResolver interface {
 	SubmitAnswer(ctx context.Context, guestID string, puzzleID string, answers []*model.CellInput) (*model.SubmitAnswerResult, error)
 	CompleteGame(ctx context.Context, gameID string, guestID string, username string) (*model.CompleteGameResult, error)
 	UnlockPuzzlesAfterAd(ctx context.Context, guestID string) (*model.GuestSetProgress, error)
+	RefreshGameConfig(ctx context.Context) (*model.GameSettings, error)
+	AdminForceCompletePuzzles(ctx context.Context, guestID string) (*model.GuestSetProgress, error)
 }
 type QueryResolver interface {
 	Game(ctx context.Context, id string) (*model.Game, error)
@@ -380,12 +396,61 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.GameResult.UpdatedAt(childComplexity), true
 
+	case "GameSettings.initialScore":
+		if e.complexity.GameSettings.InitialScore == nil {
+			break
+		}
+
+		return e.complexity.GameSettings.InitialScore(childComplexity), true
+	case "GameSettings.scoreDeductionPerMistake":
+		if e.complexity.GameSettings.ScoreDeductionPerMistake == nil {
+			break
+		}
+
+		return e.complexity.GameSettings.ScoreDeductionPerMistake(childComplexity), true
+	case "GameSettings.scoreMinimum":
+		if e.complexity.GameSettings.ScoreMinimum == nil {
+			break
+		}
+
+		return e.complexity.GameSettings.ScoreMinimum(childComplexity), true
+	case "GameSettings.staminaMax":
+		if e.complexity.GameSettings.StaminaMax == nil {
+			break
+		}
+
+		return e.complexity.GameSettings.StaminaMax(childComplexity), true
+	case "GameSettings.staminaRegenAmount":
+		if e.complexity.GameSettings.StaminaRegenAmount == nil {
+			break
+		}
+
+		return e.complexity.GameSettings.StaminaRegenAmount(childComplexity), true
+	case "GameSettings.staminaRegenIntervalMinutes":
+		if e.complexity.GameSettings.StaminaRegenIntervalMinutes == nil {
+			break
+		}
+
+		return e.complexity.GameSettings.StaminaRegenIntervalMinutes(childComplexity), true
+
 	case "GuestSetProgress.completedAt":
 		if e.complexity.GuestSetProgress.CompletedAt == nil {
 			break
 		}
 
 		return e.complexity.GuestSetProgress.CompletedAt(childComplexity), true
+	case "GuestSetProgress.currentScore":
+		if e.complexity.GuestSetProgress.CurrentScore == nil {
+			break
+		}
+
+		return e.complexity.GuestSetProgress.CurrentScore(childComplexity), true
+	case "GuestSetProgress.currentStamina":
+		if e.complexity.GuestSetProgress.CurrentStamina == nil {
+			break
+		}
+
+		return e.complexity.GuestSetProgress.CurrentStamina(childComplexity), true
 	case "GuestSetProgress.guestId":
 		if e.complexity.GuestSetProgress.GuestID == nil {
 			break
@@ -398,6 +463,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.GuestSetProgress.IsCompleted(childComplexity), true
+	case "GuestSetProgress.isLastSet":
+		if e.complexity.GuestSetProgress.IsLastSet == nil {
+			break
+		}
+
+		return e.complexity.GuestSetProgress.IsLastSet(childComplexity), true
 	case "GuestSetProgress.isUnlocked":
 		if e.complexity.GuestSetProgress.IsUnlocked == nil {
 			break
@@ -485,6 +556,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.MoveResult.TotalMistakes(childComplexity), true
 
+	case "Mutation.adminForceCompletePuzzles":
+		if e.complexity.Mutation.AdminForceCompletePuzzles == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_adminForceCompletePuzzles_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.AdminForceCompletePuzzles(childComplexity, args["guestId"].(string)), true
 	case "Mutation.completeGame":
 		if e.complexity.Mutation.CompleteGame == nil {
 			break
@@ -529,6 +611,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.MakeMove(childComplexity, args["gameId"].(string), args["row"].(int), args["col"].(int), args["value"].(int)), true
+	case "Mutation.refreshGameConfig":
+		if e.complexity.Mutation.RefreshGameConfig == nil {
+			break
+		}
+
+		return e.complexity.Mutation.RefreshGameConfig(childComplexity), true
 	case "Mutation.submitAnswer":
 		if e.complexity.Mutation.SubmitAnswer == nil {
 			break
@@ -978,6 +1066,12 @@ type Mutation {
 
   """Unlock next puzzle set after watching ad"""
   unlockPuzzlesAfterAd(guestId: ID!): GuestSetProgress!
+
+  """Refresh game configuration from database (admin only)"""
+  refreshGameConfig: GameSettings!
+
+  """Force complete all puzzles in current unlocked set for a guest (admin only)"""
+  adminForceCompletePuzzles(guestId: ID!): GuestSetProgress!
 }
 
 """Game represents a game session"""
@@ -1114,8 +1208,21 @@ type GuestSetProgress {
   puzzlesCompleted: Int!
   isUnlocked: Boolean!
   isCompleted: Boolean!
+  isLastSet: Boolean!
   unlockedAt: String
   completedAt: String
+  currentStamina: Int!
+  currentScore: Int!
+}
+
+"""Game configuration values"""
+type GameSettings {
+  staminaMax: Int!
+  staminaRegenIntervalMinutes: Int!
+  staminaRegenAmount: Int!
+  initialScore: Int!
+  scoreDeductionPerMistake: Int!
+  scoreMinimum: Int!
 }
 
 """Puzzle status enum"""
@@ -1147,6 +1254,17 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Mutation_adminForceCompletePuzzles_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "guestId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["guestId"] = arg0
+	return args, nil
+}
 
 func (ec *executionContext) field_Mutation_completeGame_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
@@ -2176,6 +2294,180 @@ func (ec *executionContext) fieldContext_GameResult_updatedAt(_ context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _GameSettings_staminaMax(ctx context.Context, field graphql.CollectedField, obj *model.GameSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameSettings_staminaMax,
+		func(ctx context.Context) (any, error) {
+			return obj.StaminaMax, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameSettings_staminaMax(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GameSettings_staminaRegenIntervalMinutes(ctx context.Context, field graphql.CollectedField, obj *model.GameSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameSettings_staminaRegenIntervalMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.StaminaRegenIntervalMinutes, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameSettings_staminaRegenIntervalMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GameSettings_staminaRegenAmount(ctx context.Context, field graphql.CollectedField, obj *model.GameSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameSettings_staminaRegenAmount,
+		func(ctx context.Context) (any, error) {
+			return obj.StaminaRegenAmount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameSettings_staminaRegenAmount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GameSettings_initialScore(ctx context.Context, field graphql.CollectedField, obj *model.GameSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameSettings_initialScore,
+		func(ctx context.Context) (any, error) {
+			return obj.InitialScore, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameSettings_initialScore(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GameSettings_scoreDeductionPerMistake(ctx context.Context, field graphql.CollectedField, obj *model.GameSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameSettings_scoreDeductionPerMistake,
+		func(ctx context.Context) (any, error) {
+			return obj.ScoreDeductionPerMistake, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameSettings_scoreDeductionPerMistake(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GameSettings_scoreMinimum(ctx context.Context, field graphql.CollectedField, obj *model.GameSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GameSettings_scoreMinimum,
+		func(ctx context.Context) (any, error) {
+			return obj.ScoreMinimum, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GameSettings_scoreMinimum(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GameSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _GuestSetProgress_guestId(ctx context.Context, field graphql.CollectedField, obj *model.GuestSetProgress) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2321,6 +2613,35 @@ func (ec *executionContext) fieldContext_GuestSetProgress_isCompleted(_ context.
 	return fc, nil
 }
 
+func (ec *executionContext) _GuestSetProgress_isLastSet(ctx context.Context, field graphql.CollectedField, obj *model.GuestSetProgress) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GuestSetProgress_isLastSet,
+		func(ctx context.Context) (any, error) {
+			return obj.IsLastSet, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GuestSetProgress_isLastSet(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GuestSetProgress",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _GuestSetProgress_unlockedAt(ctx context.Context, field graphql.CollectedField, obj *model.GuestSetProgress) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2374,6 +2695,64 @@ func (ec *executionContext) fieldContext_GuestSetProgress_completedAt(_ context.
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GuestSetProgress_currentStamina(ctx context.Context, field graphql.CollectedField, obj *model.GuestSetProgress) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GuestSetProgress_currentStamina,
+		func(ctx context.Context) (any, error) {
+			return obj.CurrentStamina, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GuestSetProgress_currentStamina(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GuestSetProgress",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GuestSetProgress_currentScore(ctx context.Context, field graphql.CollectedField, obj *model.GuestSetProgress) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GuestSetProgress_currentScore,
+		func(ctx context.Context) (any, error) {
+			return obj.CurrentScore, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_GuestSetProgress_currentScore(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GuestSetProgress",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -3032,10 +3411,16 @@ func (ec *executionContext) fieldContext_Mutation_unlockPuzzlesAfterAd(ctx conte
 				return ec.fieldContext_GuestSetProgress_isUnlocked(ctx, field)
 			case "isCompleted":
 				return ec.fieldContext_GuestSetProgress_isCompleted(ctx, field)
+			case "isLastSet":
+				return ec.fieldContext_GuestSetProgress_isLastSet(ctx, field)
 			case "unlockedAt":
 				return ec.fieldContext_GuestSetProgress_unlockedAt(ctx, field)
 			case "completedAt":
 				return ec.fieldContext_GuestSetProgress_completedAt(ctx, field)
+			case "currentStamina":
+				return ec.fieldContext_GuestSetProgress_currentStamina(ctx, field)
+			case "currentScore":
+				return ec.fieldContext_GuestSetProgress_currentScore(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GuestSetProgress", field.Name)
 		},
@@ -3048,6 +3433,112 @@ func (ec *executionContext) fieldContext_Mutation_unlockPuzzlesAfterAd(ctx conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_unlockPuzzlesAfterAd_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_refreshGameConfig(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_refreshGameConfig,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Mutation().RefreshGameConfig(ctx)
+		},
+		nil,
+		ec.marshalNGameSettings2ᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐGameSettings,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_refreshGameConfig(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "staminaMax":
+				return ec.fieldContext_GameSettings_staminaMax(ctx, field)
+			case "staminaRegenIntervalMinutes":
+				return ec.fieldContext_GameSettings_staminaRegenIntervalMinutes(ctx, field)
+			case "staminaRegenAmount":
+				return ec.fieldContext_GameSettings_staminaRegenAmount(ctx, field)
+			case "initialScore":
+				return ec.fieldContext_GameSettings_initialScore(ctx, field)
+			case "scoreDeductionPerMistake":
+				return ec.fieldContext_GameSettings_scoreDeductionPerMistake(ctx, field)
+			case "scoreMinimum":
+				return ec.fieldContext_GameSettings_scoreMinimum(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GameSettings", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_adminForceCompletePuzzles(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_adminForceCompletePuzzles,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().AdminForceCompletePuzzles(ctx, fc.Args["guestId"].(string))
+		},
+		nil,
+		ec.marshalNGuestSetProgress2ᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐGuestSetProgress,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_adminForceCompletePuzzles(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "guestId":
+				return ec.fieldContext_GuestSetProgress_guestId(ctx, field)
+			case "setId":
+				return ec.fieldContext_GuestSetProgress_setId(ctx, field)
+			case "puzzlesCompleted":
+				return ec.fieldContext_GuestSetProgress_puzzlesCompleted(ctx, field)
+			case "isUnlocked":
+				return ec.fieldContext_GuestSetProgress_isUnlocked(ctx, field)
+			case "isCompleted":
+				return ec.fieldContext_GuestSetProgress_isCompleted(ctx, field)
+			case "isLastSet":
+				return ec.fieldContext_GuestSetProgress_isLastSet(ctx, field)
+			case "unlockedAt":
+				return ec.fieldContext_GuestSetProgress_unlockedAt(ctx, field)
+			case "completedAt":
+				return ec.fieldContext_GuestSetProgress_completedAt(ctx, field)
+			case "currentStamina":
+				return ec.fieldContext_GuestSetProgress_currentStamina(ctx, field)
+			case "currentScore":
+				return ec.fieldContext_GuestSetProgress_currentScore(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GuestSetProgress", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_adminForceCompletePuzzles_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -3918,10 +4409,16 @@ func (ec *executionContext) fieldContext_Query_getCurrentSet(ctx context.Context
 				return ec.fieldContext_GuestSetProgress_isUnlocked(ctx, field)
 			case "isCompleted":
 				return ec.fieldContext_GuestSetProgress_isCompleted(ctx, field)
+			case "isLastSet":
+				return ec.fieldContext_GuestSetProgress_isLastSet(ctx, field)
 			case "unlockedAt":
 				return ec.fieldContext_GuestSetProgress_unlockedAt(ctx, field)
 			case "completedAt":
 				return ec.fieldContext_GuestSetProgress_completedAt(ctx, field)
+			case "currentStamina":
+				return ec.fieldContext_GuestSetProgress_currentStamina(ctx, field)
+			case "currentScore":
+				return ec.fieldContext_GuestSetProgress_currentScore(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GuestSetProgress", field.Name)
 		},
@@ -6250,6 +6747,70 @@ func (ec *executionContext) _GameResult(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
+var gameSettingsImplementors = []string{"GameSettings"}
+
+func (ec *executionContext) _GameSettings(ctx context.Context, sel ast.SelectionSet, obj *model.GameSettings) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, gameSettingsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("GameSettings")
+		case "staminaMax":
+			out.Values[i] = ec._GameSettings_staminaMax(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "staminaRegenIntervalMinutes":
+			out.Values[i] = ec._GameSettings_staminaRegenIntervalMinutes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "staminaRegenAmount":
+			out.Values[i] = ec._GameSettings_staminaRegenAmount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "initialScore":
+			out.Values[i] = ec._GameSettings_initialScore(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "scoreDeductionPerMistake":
+			out.Values[i] = ec._GameSettings_scoreDeductionPerMistake(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "scoreMinimum":
+			out.Values[i] = ec._GameSettings_scoreMinimum(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var guestSetProgressImplementors = []string{"GuestSetProgress"}
 
 func (ec *executionContext) _GuestSetProgress(ctx context.Context, sel ast.SelectionSet, obj *model.GuestSetProgress) graphql.Marshaler {
@@ -6286,10 +6847,25 @@ func (ec *executionContext) _GuestSetProgress(ctx context.Context, sel ast.Selec
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "isLastSet":
+			out.Values[i] = ec._GuestSetProgress_isLastSet(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "unlockedAt":
 			out.Values[i] = ec._GuestSetProgress_unlockedAt(ctx, field, obj)
 		case "completedAt":
 			out.Values[i] = ec._GuestSetProgress_completedAt(ctx, field, obj)
+		case "currentStamina":
+			out.Values[i] = ec._GuestSetProgress_currentStamina(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "currentScore":
+			out.Values[i] = ec._GuestSetProgress_currentScore(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -6495,6 +7071,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "unlockPuzzlesAfterAd":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_unlockPuzzlesAfterAd(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "refreshGameConfig":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_refreshGameConfig(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "adminForceCompletePuzzles":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_adminForceCompletePuzzles(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -7750,6 +8340,20 @@ func (ec *executionContext) marshalNGameResult2ᚖgithubᚗcomᚋkensheroᚋ100s
 		return graphql.Null
 	}
 	return ec._GameResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNGameSettings2githubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐGameSettings(ctx context.Context, sel ast.SelectionSet, v model.GameSettings) graphql.Marshaler {
+	return ec._GameSettings(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNGameSettings2ᚖgithubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐGameSettings(ctx context.Context, sel ast.SelectionSet, v *model.GameSettings) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._GameSettings(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNGameStatus2githubᚗcomᚋkensheroᚋ100sumgameᚋinternalᚋgraphqlᚋmodelᚐGameStatus(ctx context.Context, v any) (model.GameStatus, error) {

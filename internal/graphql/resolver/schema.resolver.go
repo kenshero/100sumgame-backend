@@ -217,6 +217,11 @@ func (r *mutationResolver) UnlockPuzzlesAfterAd(ctx context.Context, guestID str
 
 // RefreshGameConfig is the resolver for the refreshGameConfig field (admin only).
 func (r *mutationResolver) RefreshGameConfig(ctx context.Context) (*model.GameSettings, error) {
+	// Verify admin token
+	if err := checkAdminToken(ctx); err != nil {
+		return nil, err
+	}
+
 	// Refresh config from database
 	settings, err := r.AdminService.RefreshConfig()
 	if err != nil {
@@ -231,6 +236,29 @@ func (r *mutationResolver) RefreshGameConfig(ctx context.Context) (*model.GameSe
 		ScoreDeductionPerMistake:    settings.ScoreDeductionPerMistake,
 		ScoreMinimum:                settings.ScoreMinimum,
 	}, nil
+}
+
+// AdminForceCompletePuzzles is the resolver for the adminForceCompletePuzzles field.
+func (r *mutationResolver) AdminForceCompletePuzzles(ctx context.Context, guestID string) (*model.GuestSetProgress, error) {
+	// Verify admin token
+	if err := checkAdminToken(ctx); err != nil {
+		return nil, err
+	}
+
+	// Parse guest UUID
+	guestUUID, err := uuid.Parse(guestID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid guest ID: %w", err)
+	}
+
+	// Force complete all puzzles in current unlocked set
+	progress, err := r.AdminService.ForceCompletePuzzles(ctx, guestUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to force complete puzzles: %w", err)
+	}
+
+	// Convert to model
+	return domainGuestSetProgressToModel(progress), nil
 }
 
 // Game query resolver

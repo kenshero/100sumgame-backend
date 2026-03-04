@@ -48,7 +48,8 @@ type PuzzleProgressRepository interface {
 	UpdateSolvedPositions(ctx context.Context, guestID, puzzleID uuid.UUID, solvedPositions []domain.Position) error
 
 	// New methods for ad reward system
-	GetAvailablePuzzlesForGuest(ctx context.Context, guestID uuid.UUID, limit int) ([]*domain.PuzzleWithStatus, error)
+	// If setID is provided, filters puzzles by set_id; otherwise returns all puzzles
+	GetAvailablePuzzlesForGuest(ctx context.Context, guestID uuid.UUID, limit int, setID *uuid.UUID) ([]*domain.PuzzleWithStatus, error)
 	MarkArchived(ctx context.Context, guestID uuid.UUID) error
 	MarkAvailable(ctx context.Context, guestID uuid.UUID) error
 }
@@ -65,6 +66,7 @@ type PuzzleSetRepository interface {
 // GuestSetProgressRepository defines interface for guest set progress tracking
 type GuestSetProgressRepository interface {
 	Create(ctx context.Context, progress *domain.GuestSetProgress) error
+	CreateIfNotExists(ctx context.Context, progress *domain.GuestSetProgress) error
 	GetByGuestAndSet(ctx context.Context, guestID, setID uuid.UUID) (*domain.GuestSetProgress, error)
 	GetByGuest(ctx context.Context, guestID uuid.UUID) ([]*domain.GuestSetProgress, error)
 	GetUnlockedSet(ctx context.Context, guestID uuid.UUID) (*domain.GuestSetProgress, error)
