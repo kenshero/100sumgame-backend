@@ -19,6 +19,7 @@ type PuzzleService struct {
 	gameRepo             repository.GameRepository
 	PuzzleSetRepo        repository.PuzzleSetRepository
 	GuestSetProgressRepo repository.GuestSetProgressRepository
+	configService        *ConfigService
 }
 
 // NewPuzzleService creates a new puzzle service
@@ -28,6 +29,7 @@ func NewPuzzleService(
 	gameRepo repository.GameRepository,
 	puzzleSetRepo repository.PuzzleSetRepository,
 	guestSetProgressRepo repository.GuestSetProgressRepository,
+	configService *ConfigService,
 ) *PuzzleService {
 	return &PuzzleService{
 		repo:                 repo,
@@ -35,6 +37,7 @@ func NewPuzzleService(
 		gameRepo:             gameRepo,
 		PuzzleSetRepo:        puzzleSetRepo,
 		GuestSetProgressRepo: guestSetProgressRepo,
+		configService:        configService,
 	}
 }
 
@@ -282,6 +285,26 @@ func (s *PuzzleService) GetCurrentSet(ctx context.Context, guestID uuid.UUID) (*
 	// Try to get unlocked set
 	setProgress, err := s.GuestSetProgressRepo.GetUnlockedSet(ctx, guestID)
 	if err == nil && setProgress != nil {
+		// Regenerate stamina based on time elapsed
+		settings := s.configService.GetSettings()
+
+		newStamina, newStaminaTime, err := s.GuestSetProgressRepo.RegenerateStamina(
+			ctx,
+			guestID,
+			setProgress.SetID,
+			setProgress.CurrentStamina,
+			settings.StaminaMax,
+			settings.StaminaRegenIntervalMinutes,
+			settings.StaminaRegenAmount,
+			setProgress.LastStaminaUpdate,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		setProgress.CurrentStamina = newStamina
+		setProgress.LastStaminaUpdate = newStaminaTime
+
 		// Check if this is the last set
 		allSets, err := s.PuzzleSetRepo.GetAll(ctx)
 		if err == nil && len(allSets) > 0 {
