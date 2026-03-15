@@ -23,14 +23,14 @@ services:
   # Go Backend (Production build)
   backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: devops/Dockerfile.prod
     container_name: sum100-backend-prod
     restart: always
     ports:
       - "8080:8080"
     env_file:
-      - ./backend/devops/.env.prod
+      - ./devops/.env.prod
     depends_on:
       db:
         condition: service_healthy
