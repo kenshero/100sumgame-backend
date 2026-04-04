@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS game_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+
+- TRUNCATE TABLE game_settings;
+
 -- Insert default game settings
 INSERT INTO game_settings (key, value, description) VALUES
 ('stamina_max', '35', 'Maximum stamina a player can have'),
