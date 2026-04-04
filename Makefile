@@ -120,9 +120,9 @@ migrate:
 	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/006_add_guest_puzzle_progress.sql
 	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/007_add_puzzle_status.sql
 	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/008_add_solved_positions.sql
-    docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/009_add_puzzle_sets.sql
-    docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/010_add_game_settings.sql
-    docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/011_add_stamina_and_score.sql
+	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/009_add_puzzle_sets.sql
+	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/010_add_game_settings.sql
+	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/011_add_stamina_and_score.sql
 	@echo "$(GREEN)✅ Migrations completed!$(NC)"
 
 migrate-prod:
@@ -134,9 +134,9 @@ migrate-prod:
 	docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/006_add_guest_puzzle_progress.sql
 	docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/007_add_puzzle_status.sql
 	docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/008_add_solved_positions.sql
-    docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/009_add_puzzle_sets.sql
-    docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/010_add_game_settings.sql
-    docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/011_add_stamina_and_score.sql
+	docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/009_add_puzzle_sets.sql
+	docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/010_add_game_settings.sql
+	docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/011_add_stamina_and_score.sql
 	@echo "$(GREEN)✅ Migrations completed!$(NC)"
 
 seed:
