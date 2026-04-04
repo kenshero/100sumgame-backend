@@ -120,7 +120,17 @@ migrate:
 	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/006_add_guest_puzzle_progress.sql
 	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/007_add_puzzle_status.sql
 	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/008_add_solved_positions.sql
-	docker exec -i sum100-db psql -U postgres -d sum100game < internal/database/migrations/009_add_puzzle_sets.sql
+	@echo "$(GREEN)✅ Migrations completed!$(NC)"
+
+migrate-prod:
+	@echo "$(YELLOW)📦 Running migrations...$(NC)"
+	docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/001_create_puzzle_pool.sql
+	docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/002_create_game_sessions.sql
+	docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/003_create_leaderboard.sql
+	docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/004_add_guest_id.sql
+	docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/006_add_guest_puzzle_progress.sql
+	docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/007_add_puzzle_status.sql
+	docker exec -i sum100-db-prod psql -U postgres -d sum100game < internal/database/migrations/008_add_solved_positions.sql
 	@echo "$(GREEN)✅ Migrations completed!$(NC)"
 
 seed:
@@ -159,3 +169,8 @@ clean:
 	@echo "$(YELLOW)🧹 Cleaning up containers and volumes...$(NC)"
 	docker-compose down -v --remove-orphans
 	@echo "$(GREEN)✅ Cleaned up!$(NC)"
+
+
+setup-db-prod:
+	@echo "$(YELLOW)🚀 Setting up production database...$(NC)"
+	DATABASE_URL="postgres://postgres:F9TJte9y08WHicBfsLkrsPRl@api.100sum.online:5432/sum100game?sslmode=disable" go run scripts/seed_puzzle_sets_prod.go -sets=10
