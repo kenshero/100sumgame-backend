@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS game_settings (
 );
 
 
-- TRUNCATE TABLE game_settings;
+TRUNCATE TABLE game_settings;
 
 -- Insert default game settings
 INSERT INTO game_settings (key, value, description) VALUES
